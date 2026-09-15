@@ -37,7 +37,7 @@ Native ProximityPrompt events do not bypass this boundary; `InteractionBinder` s
 | Fake decoy/reward | Server-owned use count; no client reward input | Inventory ownership is intentionally absent in MVP |
 | Spectator grief / hidden-player leak | Spectator-only states are rejected before dispatch; spectator cycling excludes hidden players; hidden parts are transparent, non-physical, non-touchable, and non-queryable; no hiding ID/concealed attribute is replicated on Player | Roblox cannot make replicated map topology secret; re-test accessories and future VFX whenever character cosmetics are introduced |
 | Hunter oracle or fake exposure | No exposure remote exists; the server creates breach state and permits discovery only on a reached/near completed inspection | Tuning must ensure authored approach points do not create unfair through-wall captures |
-| Respawn ghost state | One lifecycle coordinator clears occupancy, door leases, rescue attempts, capture/context references | Phase 2 must test Roblox respawn settings and latency |
+| Respawn ghost state | One lifecycle coordinator clears occupancy, door leases, rescue attempts, capture/context references; Prepare securely relocates surviving terminal rigs to ArrivalSpawn and reloads dead/missing rigs before the authoritative Active reset | Re-test under eight-player latency |
 | Remote replacement | Fixed folder/name/class assertions | Studio must not author conflicting remotes |
 | Analytics injection | Server-only allow-list | In-memory provider is non-durable by design |
 | Secret exposure | `.gitignore`, placeholders, read-only CI permissions, no deploy job | Repository history must still be reviewed before visibility changes |

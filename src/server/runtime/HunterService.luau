@@ -5,6 +5,7 @@ local Workspace = game:GetService("Workspace")
 
 local HunterBrain = require(script.Parent.Parent.domain.HunterBrain)
 local HunterInspection = require(script.Parent.Parent.domain.HunterInspection)
+local NearMissPolicy = require(script.Parent.Parent.domain.NearMissPolicy)
 local NativeNavigationProvider = require(script.Parent.NativeNavigationProvider)
 local NavigationProvider = require(script.Parent.NavigationProvider)
 
@@ -43,17 +44,28 @@ function HunterService.new(
 		_lastEvidenceId = nil,
 		_lastRoundPhase = nil,
 		_wasActive = false,
-		_random = Random.new(2405),
+		_random = Random.new(),
 		_patrolOrder = {},
 		_searchCenter = nil,
 		_searchTarget = nil,
 		_searchPointsRemaining = 0,
 		_doubleTakeRequested = false,
+		_chaseStartedAt = nil,
+		_chaseClosestDistance = math.huge,
+		_spawnCFrame = nil,
 	}, HunterService)
 end
 
 function HunterService:RequestDoubleTake()
+	if
+		self._doubleTakeRequested
+		or self._brain:GetState() ~= "SEARCH"
+		or self._lastTarget == nil
+	then
+		return false
+	end
 	self._doubleTakeRequested = true
+	return true
 end
 
 function HunterService:_root(): BasePart?
@@ -204,12 +216,39 @@ function HunterService:Start(): (boolean, string?)
 		return false, "no tagged hunter model; HunterService remains safely inactive"
 	end
 	self._hunter = candidate
+	self._spawnCFrame = candidate:GetPivot()
 	self._navigation = NativeNavigationProvider.new(candidate, self._config.Hunter)
 	local valid, err = NavigationProvider.validate(self._navigation)
 	if not valid then
 		return false, err
 	end
 	return true, nil
+end
+
+function HunterService:ResetRound()
+	if self._navigation ~= nil and self._navigation:GetStatus() ~= "Idle" then
+		self._navigation:Cancel()
+	end
+	self._brain:Reset()
+	self._lastTarget = nil
+	self._patrolTarget = nil
+	self._lastEvidenceId = nil
+	self._lastSeenPlayerId = nil
+	self._searchCenter = nil
+	self._searchTarget = nil
+	self._searchPointsRemaining = 0
+	self._doubleTakeRequested = false
+	self._chaseStartedAt = nil
+	self._chaseClosestDistance = math.huge
+	self._wasActive = false
+	if self._hunter ~= nil and self._spawnCFrame ~= nil then
+		self._hunter:PivotTo(self._spawnCFrame)
+		local root = self:_root()
+		if root ~= nil then
+			root.AssemblyLinearVelocity = Vector3.zero
+			root.AssemblyAngularVelocity = Vector3.zero
+		end
+	end
 end
 
 function HunterService:Tick(now: number)
@@ -263,6 +302,16 @@ function HunterService:Tick(now: number)
 		navigationGeneration = navigationGeneration,
 		patrolReturnPosition = self._patrolTarget,
 	})
+	if decision.state == "CHASE" then
+		if previousBrainState ~= "CHASE" then
+			self._chaseStartedAt = now
+			self._chaseClosestDistance = math.huge
+		end
+		if visiblePosition ~= nil then
+			self._chaseClosestDistance =
+				math.min(self._chaseClosestDistance, (root.Position - visiblePosition).Magnitude)
+		end
+	end
 	local humanoid = self._hunter and self._hunter:FindFirstChildOfClass("Humanoid")
 	if humanoid ~= nil then
 		humanoid.WalkSpeed = if decision.state == "CHASE"
@@ -313,7 +362,18 @@ function HunterService:Tick(now: number)
 		self._searchPointsRemaining = self._config.Hunter.SearchPointCount
 		self._searchTarget = self:_nextSearchPosition(self._searchCenter)
 		if previousBrainState == "CHASE" then
-			self._analytics:Emit("near_miss", { source = decision.reason }, now)
+			local chaseDuration = now - (self._chaseStartedAt or now)
+			if
+				NearMissPolicy.qualifies(self._config, chaseDuration, self._chaseClosestDistance)
+			then
+				self._analytics:Emit("near_miss", {
+					source = decision.reason,
+					duration = chaseDuration,
+					closestDistance = self._chaseClosestDistance,
+				}, now)
+			end
+			self._chaseStartedAt = nil
+			self._chaseClosestDistance = math.huge
 		end
 	elseif decision.state ~= "SEARCH" then
 		self._searchCenter = nil

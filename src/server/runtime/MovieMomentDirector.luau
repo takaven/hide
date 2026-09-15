@@ -2,18 +2,18 @@
 
 local MovieMomentDirector = {}
 MovieMomentDirector.__index = MovieMomentDirector
-
-local ROTATING_MOMENTS =
-	{ "CYCLONE_BLACKOUT", "RECEPTION_PHONE", "GENERATOR_RESTART", "DOUBLE_TAKE" }
+local WeightedChoice = require(script.Parent.Parent.domain.WeightedChoice)
 
 function MovieMomentDirector.new(dependencies: any)
-	dependencies._roundIndex = 0
 	dependencies._count = 0
 	dependencies._lastAt = -math.huge
 	dependencies._phase = nil
 	dependencies._phaseStartedAt = 0
+	dependencies._huntMomentAt = math.huge
 	dependencies._blackoutGeneration = 0
-	dependencies._random = Random.new(817)
+	dependencies._random = Random.new()
+	dependencies._lastHuntMoment = nil
+	dependencies._gateJamPlanned = false
 	return setmetatable(dependencies, MovieMomentDirector)
 end
 
@@ -97,7 +97,9 @@ function MovieMomentDirector:Trigger(kind: string, now: number): boolean
 		}, now)
 		self:_announce(kind, "THE GENERATOR IS RESTARTING", now)
 	elseif kind == "DOUBLE_TAKE" then
-		self.Hunter:RequestDoubleTake()
+		if not self.Hunter:RequestDoubleTake() then
+			return false
+		end
 		self:_announce(kind, "THE LISTENER STOPPED — DID IT HEAR THAT?", now)
 	elseif kind == "FINAL_ESCAPE_EVENT" then
 		self.Audio:Play("ExtractionAlarm")
@@ -114,6 +116,9 @@ function MovieMomentDirector:Trigger(kind: string, now: number): boolean
 	end
 	self._count += 1
 	self._lastAt = now
+	if type(self.Config.MovieMoments.Weights[kind]) == "number" then
+		self._lastHuntMoment = kind
+	end
 	return true
 end
 
@@ -121,23 +126,31 @@ function MovieMomentDirector:Tick(now: number, phase: string)
 	if phase ~= self._phase then
 		self._phase = phase
 		self._phaseStartedAt = now
+		if phase == "Hunt" and self._count == 0 then
+			self._huntMomentAt = now
+				+ self._random:NextNumber(
+					self.Config.MovieMoments.HuntMinimumDelay,
+					self.Config.MovieMoments.HuntMaximumDelay
+				)
+		end
 	end
 	if self._count >= self.Config.MovieMoments.MaxPerRound then
 		return
 	end
-	if phase == "Hunt" and self._count == 0 and now - self._phaseStartedAt >= 10 then
-		local index = ((self._roundIndex - 1) % #ROTATING_MOMENTS) + 1
-		local selected = ROTATING_MOMENTS[index]
-		if
-			selected == "DOUBLE_TAKE"
-			and self._random:NextNumber() > self.Config.Hunter.DoubleTakeChance
-		then
-			selected = "RECEPTION_PHONE"
+	if phase == "Hunt" and self._count == 0 and now >= self._huntMomentAt then
+		local selected = WeightedChoice.select(
+			self.Config.MovieMoments.Weights,
+			self._random:NextNumber(),
+			self._lastHuntMoment
+		)
+		if selected ~= nil and not self:Trigger(selected, now) then
+			-- A rejected Double Take is silent; schedule a fresh authored choice.
+			self._huntMomentAt = now + 1
 		end
-		self:Trigger(selected, now)
 	elseif
 		phase == "Extraction"
 		and self._count == 1
+		and self._gateJamPlanned
 		and now - self._phaseStartedAt >= self.Config.Extraction.GateJamDelay
 	then
 		self:Trigger("FINAL_ESCAPE_EVENT", now)
@@ -145,10 +158,11 @@ function MovieMomentDirector:Tick(now: number, phase: string)
 end
 
 function MovieMomentDirector:ResetRound()
-	self._roundIndex += 1
 	self._count = 0
 	self._lastAt = -math.huge
 	self._phase = nil
+	self._huntMomentAt = math.huge
+	self._gateJamPlanned = self._random:NextNumber() < self.Config.MovieMoments.GateJamChance
 	self._blackoutGeneration += 1
 	self.WorldRoot:SetAttribute("HunterVisionMultiplier", 1)
 	self.WorldRoot:SetAttribute("MovementNoiseMultiplier", 1)

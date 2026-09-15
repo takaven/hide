@@ -18,7 +18,7 @@ The map targets eight players. Studio uses a one-player minimum solely for local
 
 - Arrival/reception, guest wing, restaurant/lounge, kitchen/service, laundry/maintenance, generator room, covered walkway, ceilings, intersecting corridors, sightline breaks, and two evacuation routes.
 - Six server-registered hiding locations with ten total slots for eight target players. Every location has hidden placement, risky peek, and accessible Listener inspection points.
-- Three server-leased brace doors and eight shuffled patrol points.
+- Three server-leased brace doors physically occupy the guest-wing wall gap, kitchen-service wall gap, and sole generator approach. The generator's alternate opening is sealed. Eight patrol points remain shuffled each round.
 - Server-generated Listener rig using original primitive geometry.
 - Le-Morne-inspired stepped basalt silhouette and front ridges, storm-facing Indian Ocean, filaos, ravenala/traveller's palms, volcanic stone, timber, sugar chimney, four-stripe Mauritius flags, `SORTIE / EXIT / SORTI`, bus-stop and dodo cues, and explicit Le Morne/Mauritius resort signage.
 - Storm grading, emergency lighting, visual rain, low storm wind, thunder-synchronised lightning, and visibility bright enough for mobile navigation.
@@ -30,11 +30,11 @@ The map targets eight players. Studio uses a one-player minimum solely for local
 - Server concealment, immobilisation, collision suppression, and safe reveal for hiding avatars.
 - Server-observed movement noise with floor-material multipliers.
 - Risky server-authorised hiding peek with an authored viewpoint, cooldown, and noise cost.
-- Physical door bracing bound to an expiring server lease: the passage is held shut while the helper is immobilised and exposed.
+- Physical door bracing bound to an expiring server lease: each panel gates a real passage and is held shut while the helper is immobilised and exposed.
 - Hold-to-rescue prompt bound to the tested rescue lifecycle and cancellation rules.
 - One-use storm-clicker decoy using the same evidence ledger as real noise.
 - Forced reveal/ejection at extraction, two alternating routes with a final gate-jam switch, safe spectator cycling, repeat-round reset, and Roblox-native analytics provider.
-- Spatial Listener/hiding/door/decoy/rescue/extraction audio and five bounded movie moments, with at most two selected per round.
+- Spatial Listener/hiding/door/decoy/rescue/extraction audio and five bounded movie moments. Hunt timing and weighted selection vary, immediate repeats are suppressed, and the extraction jam is probabilistic.
 
 ## Studio evidence
 
@@ -51,6 +51,9 @@ The following has been exercised through automated Studio sessions rather than i
 - Shared occupancy: a stable three-client run placed three players in the capacity-three guest linen spot through the production request/accept input path. All three reported `Hiding`; diagnostics recorded two `entry_accepted`, two `shared_hiding_started`, `silence_broken`, and a subsequent hunter investigation.
 - Hiding security and peek: all three hidden rigs were anchored with zero visible/collidable/touchable/queryable parts and no replicated hiding ID/concealed attributes. A real peek changed the client camera to `Scriptable`, retained the truthful `SUSPICION • HOT` HUD, and added server evidence.
 - Terminal-state physics: an eliminated avatar was relocated to the spectator area with zero visible or physical/queryable parts. A forced torso-collision re-enable was cleared on the next presentation tick, covering Roblox Humanoid collision restoration.
+- Cross-round terminal reset: a Studio smoke round forced a live player to Eliminated at the safe spectator platform, then allowed the real `Results -> Lobby -> Prepare -> Hunt` sequence to run. In the next Hunt the same player was Active, health 100, had no downed marker, stood 3.50 studs from `ArrivalSpawn`, and The Listener had reset 103.80 studs away. A focused reset harness also returned capture count zero. This closes both the unsafe-unanchor path and carry-over hunter spawn camping found during adversarial validation.
+- HUD/context: a server snapshot at heat `0.6` rendered `SUSPICION • HOT — MOVE SOON`. During a synthetic live Let Me In decision, LET IN and REFUSE were present while PEEK was absent.
+- Lighting and passages: blackout changed six enabled house fixtures to zero while all five emergency fixtures stayed lit. Closed door coordinates align with the guest-wing gap `(-86, 4)`, kitchen-service gap `(51, -18)`, and generator approach `(0, -49)`; the alternate generator opening is sealed.
 - Mobile: 20:9 Samsung Galaxy A06, 16:9 iPhone 7, and iPad 9th-generation landscape captures kept the objective HUD and large touch controls in bounds.
 - Navigation: The Listener moved 25.58 studs during a four-second native-pathing sample on the built map.
 - Performance snapshot: Scene Analysis reported 165 Parts, 7,222 opaque triangles, 15 opaque draw calls, and 821 total runtime instances including Roblox/Core UI content. This is a greybox measurement, not a lower-end device frame-time result.

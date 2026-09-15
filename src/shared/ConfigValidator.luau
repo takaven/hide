@@ -201,6 +201,16 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 	positive(errors, "Hunter.LastKnownPursuitSeconds", field(hunter, "LastKnownPursuitSeconds"))
 	positive(errors, "Hunter.SearchPointCount", field(hunter, "SearchPointCount"))
 	positive(errors, "Hunter.SearchRadius", field(hunter, "SearchRadius"))
+	positive(
+		errors,
+		"Hunter.NearMissMinimumChaseDuration",
+		field(hunter, "NearMissMinimumChaseDuration")
+	)
+	positive(
+		errors,
+		"Hunter.NearMissMaximumClosestDistance",
+		field(hunter, "NearMissMaximumClosestDistance")
+	)
 	local searchPointCount = field(hunter, "SearchPointCount")
 	if
 		type(searchPointCount) ~= "number"
@@ -210,14 +220,12 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 	then
 		table.insert(errors, "Hunter.SearchPointCount must be an integer from 2 to 3")
 	end
-	local doubleTakeChance = field(hunter, "DoubleTakeChance")
-	if type(doubleTakeChance) ~= "number" or doubleTakeChance < 0 or doubleTakeChance > 1 then
-		table.insert(errors, "Hunter.DoubleTakeChance must be between 0 and 1")
-	end
 	local movieMoments = field(config, "MovieMoments")
 	for _, key in ipairs({
 		"MaxPerRound",
 		"MinimumSpacing",
+		"HuntMinimumDelay",
+		"HuntMaximumDelay",
 		"BlackoutDuration",
 		"BlackoutVisionMultiplier",
 		"BlackoutMovementNoiseMultiplier",
@@ -225,6 +233,32 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 		"GeneratorMagnitude",
 	}) do
 		positive(errors, `MovieMoments.{key}`, field(movieMoments, key))
+	end
+	local huntMinimumDelay = field(movieMoments, "HuntMinimumDelay")
+	local huntMaximumDelay = field(movieMoments, "HuntMaximumDelay")
+	if
+		type(huntMinimumDelay) == "number"
+		and type(huntMaximumDelay) == "number"
+		and huntMaximumDelay < huntMinimumDelay
+	then
+		table.insert(errors, "MovieMoments.HuntMaximumDelay must be >= HuntMinimumDelay")
+	end
+	local gateJamChance = field(movieMoments, "GateJamChance")
+	if type(gateJamChance) ~= "number" or gateJamChance < 0 or gateJamChance > 1 then
+		table.insert(errors, "MovieMoments.GateJamChance must be between 0 and 1")
+	end
+	local momentWeights = field(movieMoments, "Weights")
+	if type(momentWeights) ~= "table" then
+		table.insert(errors, "MovieMoments.Weights must be a table")
+	else
+		for _, kind in ipairs({
+			"CYCLONE_BLACKOUT",
+			"RECEPTION_PHONE",
+			"GENERATOR_RESTART",
+			"DOUBLE_TAKE",
+		}) do
+			positive(errors, `MovieMoments.Weights.{kind}`, field(momentWeights, kind))
+		end
 	end
 	local maxMoments = field(movieMoments, "MaxPerRound")
 	if type(maxMoments) ~= "number" or maxMoments % 1 ~= 0 or maxMoments < 1 or maxMoments > 2 then

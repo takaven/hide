@@ -278,6 +278,7 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 		end
 		if payload.enabled then
 			self._lastPeek[playerId] = now
+			self.Hiding:AddRecentNoise(payload.hidingId, self.Config.Hiding.PeekNoise)
 			self:_noise(
 				"HidingEntry",
 				self.Config.Hiding.PeekNoise,

@@ -31,7 +31,7 @@ function StudioTestOverrides.Apply(config: any)
 		config.Round.MinimumPlayers = minimumPlayers
 	end
 	local phaseDuration = tonumber(args.phaseDuration)
-	if phaseDuration == nil or phaseDuration < 30 or phaseDuration > 900 then
+	if phaseDuration == nil or phaseDuration < 5 or phaseDuration > 900 then
 		return
 	end
 	config.Round.Durations.Lobby = 1

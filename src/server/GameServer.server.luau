@@ -155,7 +155,7 @@ local actionService = ActionService.new({
 })
 local gateway = RemoteGateway.new(Config, remotes, actionService)
 local interactions = InteractionBinder.new(Config, world, gateway)
-local silence = SilenceMonitor.new(hiding, noise, analytics, remotes)
+local silence = SilenceMonitor.new(Config, hiding, noise, analytics, remotes)
 local movementNoise = MovementNoiseService.new(Config, playerStates, noise, analytics)
 local downedEvidence = DownedEvidenceService.new(Config, playerStates, noise)
 local statePresentation = PlayerStatePresentationService.new(playerStates, worldRoot)
@@ -189,6 +189,60 @@ if RunService:IsStudio() then
 		return soakMetrics:GetReport()
 	end
 	diagnostics.Parent = ServerStorage
+	local stagingGateTest = Instance.new("BindableFunction")
+	stagingGateTest.Name = "HideStudioStagingGate"
+	stagingGateTest.OnInvoke = function(mode: string?)
+		local player = Players:GetPlayers()[1]
+		if player == nil then
+			return { ok = false, error = "no player" }
+		end
+		local playerId = tostring(player.UserId)
+		local now = workspace:GetServerTimeNow()
+		playerStates:ResetForRound({ playerId }, now)
+		capture:Down(playerId, now, "studio_reset_regression")
+		playerStates:ResolveDowned(playerId, 1, false, now)
+		statePresentation:Tick()
+		local spectatorSpawn = worldRoot:FindFirstChild("SpectatorSpawn", true)
+		local terminalPosition = if player.Character
+			then player.Character:GetPivot().Position
+			else nil
+		if mode == "eliminate_only" then
+			return {
+				ok = playerStates:Get(playerId) == "Eliminated",
+				state = playerStates:Get(playerId),
+				positionY = if terminalPosition then terminalPosition.Y else nil,
+			}
+		end
+		capture:ResetRound()
+		statePresentation:ResetRound()
+		playerStates:ResetForRound({ playerId }, now + 1)
+		statePresentation:Tick()
+		local character = player.Character
+		local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
+		local arrivalSpawn = worldRoot:FindFirstChild("ArrivalSpawn", true)
+		local finalPosition = if character then character:GetPivot().Position else nil
+		return {
+			ok = playerStates:Get(playerId) == "Active"
+				and humanoid ~= nil
+				and humanoid.Health > 0
+				and finalPosition ~= nil
+				and arrivalSpawn ~= nil
+				and arrivalSpawn:IsA("BasePart")
+				and (finalPosition - arrivalSpawn.Position).Magnitude < 8,
+			state = playerStates:Get(playerId),
+			captureCount = playerStates:GetCaptureCount(playerId),
+			health = if humanoid then humanoid.Health else 0,
+			terminalPosition = terminalPosition,
+			finalPosition = finalPosition,
+			spectatorSpawnPosition = if spectatorSpawn and spectatorSpawn:IsA("BasePart")
+				then spectatorSpawn.Position
+				else nil,
+			arrivalPosition = if arrivalSpawn and arrivalSpawn:IsA("BasePart")
+				then arrivalSpawn.Position
+				else nil,
+		}
+	end
+	stagingGateTest.Parent = ServerStorage
 end
 
 local function registerPlayer(player: Player)
@@ -223,6 +277,7 @@ for _, resetter in ipairs({
 	rescueInteractions,
 	downedEvidence,
 	statePresentation,
+	hunter,
 	movieMoments,
 	soakMetrics,
 }) do

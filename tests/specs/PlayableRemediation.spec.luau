@@ -66,5 +66,26 @@ return {
 		invalidMoments.MovieMoments = table.clone(Config.MovieMoments)
 		invalidMoments.MovieMoments.MaxPerRound = 3
 		Assert.falsy(ConfigValidator.validate(invalidMoments))
+
+		local invalidWindow = table.clone(Config)
+		invalidWindow.MovieMoments = table.clone(Config.MovieMoments)
+		invalidWindow.MovieMoments.HuntMaximumDelay = Config.MovieMoments.HuntMinimumDelay - 1
+		Assert.falsy(ConfigValidator.validate(invalidWindow))
+
+		local invalidGateJam = table.clone(Config)
+		invalidGateJam.MovieMoments = table.clone(Config.MovieMoments)
+		invalidGateJam.MovieMoments.GateJamChance = 1.1
+		Assert.falsy(ConfigValidator.validate(invalidGateJam))
+
+		local invalidMomentWeight = table.clone(Config)
+		invalidMomentWeight.MovieMoments = table.clone(Config.MovieMoments)
+		invalidMomentWeight.MovieMoments.Weights = table.clone(Config.MovieMoments.Weights)
+		invalidMomentWeight.MovieMoments.Weights.DOUBLE_TAKE = 0
+		Assert.falsy(ConfigValidator.validate(invalidMomentWeight))
+
+		local invalidNearMiss = table.clone(Config)
+		invalidNearMiss.Hunter = table.clone(Config.Hunter)
+		invalidNearMiss.Hunter.NearMissMinimumChaseDuration = 0
+		Assert.falsy(ConfigValidator.validate(invalidNearMiss))
 	end,
 }

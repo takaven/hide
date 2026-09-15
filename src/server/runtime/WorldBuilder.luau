@@ -86,10 +86,16 @@ local function wedge(
 	return item
 end
 
-local function addLight(parent: Instance, position: Vector3, color: Color3, range: number)
+local function addLight(
+	parent: Instance,
+	position: Vector3,
+	color: Color3,
+	range: number,
+	emergency: boolean?
+)
 	local fixture = part(
 		parent,
-		"EmergencyLight",
+		if emergency then "EmergencyLight" else "HouseLight",
 		Vector3.new(1.6, 0.3, 0.6),
 		position,
 		color,
@@ -627,7 +633,7 @@ function WorldBuilder.Build(): Model
 		root,
 		"SpectatorSpawn",
 		Vector3.new(8, 1, 8),
-		Vector3.new(0, 40, 90),
+		Vector3.new(0, 13, 40),
 		Color3.new(1, 1, 1)
 	)
 	spectatorSpawn.Transparency = 1
@@ -671,9 +677,12 @@ function WorldBuilder.Build(): Model
 		)
 	end
 
-	addDoor(root, "guest-service", Vector3.new(-24, 0, -12), 90)
-	addDoor(root, "kitchen-service", Vector3.new(28, 0, -21), 0)
-	addDoor(root, "generator-firedoor", Vector3.new(0, 0, -48), 0)
+	-- Each brace panel occupies the eight-stud opening authored by addRoom.
+	addDoor(root, "guest-service", Vector3.new(-86, 0, 4), 90)
+	addDoor(root, "kitchen-service", Vector3.new(51, 0, -18), 0)
+	addDoor(root, "generator-firedoor", Vector3.new(0, 0, -49), 0)
+	-- Seal the unused generator-side opening so the fire door is the route.
+	wall(root, Vector3.new(0, 6, -73), Vector3.new(34, 12, 1))
 
 	local extraction = part(
 		root,
@@ -826,7 +835,7 @@ function WorldBuilder.Build(): Model
 		Vector3.new(0, 10, -36),
 		Vector3.new(0, 10, -58),
 	}) do
-		addLight(root, position, palette.emergency, 25)
+		addLight(root, position, palette.emergency, 25, true)
 	end
 	for _, position in ipairs({
 		Vector3.new(0, 9, 46),
@@ -836,7 +845,7 @@ function WorldBuilder.Build(): Model
 		Vector3.new(-48, 9, -35),
 		Vector3.new(0, 9, -61),
 	}) do
-		addLight(root, position, Color3.fromRGB(190, 210, 201), 32)
+		addLight(root, position, Color3.fromRGB(190, 210, 201), 32, false)
 	end
 	addListener(root, Vector3.new(0, 2, -57))
 	return root

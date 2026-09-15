@@ -98,7 +98,7 @@ return {
 		RangeGraceSeconds = 1.5,
 		CompletionGraceSeconds = 3,
 		DownedEvidenceInterval = 5,
-		DownedEvidenceMagnitude = 0.16,
+		DownedEvidenceMagnitude = 0.24,
 	},
 
 	Decoy = {
@@ -137,12 +137,22 @@ return {
 		LastKnownPursuitSeconds = 1.25,
 		SearchPointCount = 3,
 		SearchRadius = 14,
-		DoubleTakeChance = 0.18,
+		NearMissMinimumChaseDuration = 3,
+		NearMissMaximumClosestDistance = 12,
 	},
 
 	MovieMoments = {
 		MaxPerRound = 2,
 		MinimumSpacing = 22,
+		HuntMinimumDelay = 8,
+		HuntMaximumDelay = 18,
+		GateJamChance = 0.45,
+		Weights = {
+			CYCLONE_BLACKOUT = 3,
+			RECEPTION_PHONE = 3,
+			GENERATOR_RESTART = 2,
+			DOUBLE_TAKE = 1,
+		},
 		BlackoutDuration = 8,
 		BlackoutVisionMultiplier = 0.55,
 		BlackoutMovementNoiseMultiplier = 1.3,

@@ -1,6 +1,7 @@
 --!strict
 
 local Players = game:GetService("Players")
+local RoundPlayerReset = require(script.Parent.Parent.domain.RoundPlayerReset)
 
 local PlayerStatePresentationService = {}
 PlayerStatePresentationService.__index = PlayerStatePresentationService
@@ -159,6 +160,40 @@ function PlayerStatePresentationService:Tick()
 end
 
 function PlayerStatePresentationService:ResetRound()
+	local arrivalSpawn = self._worldRoot:FindFirstChild("ArrivalSpawn", true)
+	for _, player in ipairs(Players:GetPlayers()) do
+		local playerId = tostring(player.UserId)
+		local character = player.Character
+		local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
+		local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+		local plan = RoundPlayerReset.plan(
+			self._playerStates:Get(playerId),
+			character ~= nil
+				and humanoid ~= nil
+				and humanoid.Health > 0
+				and root ~= nil
+				and root:IsA("BasePart")
+		)
+		if plan.placement == "ReloadCharacter" then
+			self:_restore(playerId)
+			player:LoadCharacter()
+		elseif
+			plan.placement == "ArrivalSpawn"
+			and arrivalSpawn ~= nil
+			and arrivalSpawn:IsA("BasePart")
+		then
+			if root ~= nil and root:IsA("BasePart") then
+				-- Relocate while the terminal rig is still anchored and non-physical,
+				-- then restore its authored presentation at the valid round spawn.
+				root.Anchored = true
+				character:PivotTo(arrivalSpawn.CFrame + Vector3.new(0, 4, 0))
+				root.AssemblyLinearVelocity = Vector3.zero
+				root.AssemblyAngularVelocity = Vector3.zero
+				self:_restore(playerId)
+				root.Anchored = false
+			end
+		end
+	end
 	for playerId in pairs(self._saved) do
 		self:_restore(playerId)
 	end

@@ -11,10 +11,12 @@ local actionRequest = remotesFolder:WaitForChild(Protocol.RequestEventName) :: R
 local actionResult = remotesFolder:WaitForChild(Protocol.ResultEventName) :: RemoteEvent
 local stateSnapshot = remotesFolder:WaitForChild(Protocol.SnapshotEventName) :: RemoteEvent
 local getStateSnapshot = remotesFolder:WaitForChild(Protocol.SnapshotFunctionName) :: RemoteFunction
+local SuspicionTier = require(ReplicatedStorage.Hide.Shared.SuspicionTier)
 
 local currentContext: any? = nil
 local requestCounter = 0
 local entryRequestGeneration = 0
+local entryDecisionActive = false
 local currentPhase = "Lobby"
 local phaseDeadline = 0
 local currentState = "Spectating"
@@ -199,6 +201,9 @@ end
 
 local function bindPeek(hidingId: string)
 	ContextActionService:UnbindAction("HidePeek")
+	if entryDecisionActive then
+		return
+	end
 	ContextActionService:BindAction("HidePeek", function(_, inputState)
 		if inputState == Enum.UserInputState.Begin then
 			setPeek(not peekEnabled)
@@ -221,6 +226,7 @@ end
 
 local function clearEntryRequest(restoreHidingActions: boolean?)
 	entryRequestGeneration += 1
+	entryDecisionActive = false
 	ContextActionService:UnbindAction("HideAcceptEntry")
 	ContextActionService:UnbindAction("HideRefuseEntry")
 	if restoreHidingActions == true and currentState == "Hiding" and currentContext ~= nil then
@@ -233,6 +239,7 @@ end
 
 local function bindEntryRequest(entryRequest: any)
 	clearEntryRequest(false)
+	entryDecisionActive = true
 	ContextActionService:UnbindAction("HidePrimaryAction")
 	ContextActionService:UnbindAction("HidePeek")
 	local generation = entryRequestGeneration
@@ -468,10 +475,11 @@ local function applySnapshot(snapshot: any)
 			elseif risk >= 0.35 then Color3.fromRGB(229, 197, 62)
 			else Color3.fromRGB(68, 196, 135)
 		local heat = math.clamp(tonumber(silence.heat) or 0, 0, 1)
-		local suspicion = if silence.exposed == true
+		local tier = SuspicionTier.fromValues(Config, heat, silence.exposed == true)
+		local suspicion = if tier == "EXPOSED"
 			then "EXPOSED — IT CAN FIND YOU"
-			elseif heat >= Config.Hiding.InspectionHeatThreshold then "HOT — MOVE SOON"
-			elseif heat >= Config.Hiding.WarmHeatThreshold then "WARM — IT IS LEARNING"
+			elseif tier == "HOT" then "HOT — MOVE SOON"
+			elseif tier == "WARM" then "WARM — IT IS LEARNING"
 			else "SAFE"
 		suspicionLabel.Text = `SUSPICION  •  {suspicion}`
 		suspicionLabel.TextColor3 = if silence.exposed == true
@@ -497,7 +505,9 @@ local function applySnapshot(snapshot: any)
 		unbindContext()
 	end
 	if type(snapshot) == "table" and snapshot.peekAction ~= nil then
-		bindPeek(snapshot.peekAction.hidingId)
+		if not entryDecisionActive then
+			bindPeek(snapshot.peekAction.hidingId)
+		end
 	elseif type(snapshot) == "table" and snapshot.clearPeek == true then
 		unbindPeek()
 		updateCamera()

@@ -1,17 +1,21 @@
 --!strict
 
 local Players = game:GetService("Players")
+local SuspicionTier = require(game:GetService("ReplicatedStorage").Hide.Shared.SuspicionTier)
+local SuspicionSnapshotPolicy = require(script.Parent.Parent.domain.SuspicionSnapshotPolicy)
 
 local SilenceMonitor = {}
 SilenceMonitor.__index = SilenceMonitor
 
-function SilenceMonitor.new(hiding: any, noise: any, analytics: any, remotes: any?)
+function SilenceMonitor.new(config: any, hiding: any, noise: any, analytics: any, remotes: any?)
 	return setmetatable({
+		_config = config,
 		_hiding = hiding,
 		_noise = noise,
 		_analytics = analytics,
 		_lastStates = {},
 		_lastRisk = {},
+		_lastSuspicionTiers = {},
 		_remotes = remotes,
 	}, SilenceMonitor)
 end
@@ -19,6 +23,7 @@ end
 function SilenceMonitor:ResetRound()
 	self._lastStates = {}
 	self._lastRisk = {}
+	self._lastSuspicionTiers = {}
 end
 
 function SilenceMonitor:_movementFactor(hidingId: string): number
@@ -48,14 +53,22 @@ function SilenceMonitor:Tick(elapsed: number, now: number)
 		if spot ~= nil and result ~= nil then
 			local previous = self._lastStates[hidingId]
 			local previousRisk = self._lastRisk[hidingId]
+			local heat = self._hiding:GetHeat(hidingId, now)
+			local exposed = self._hiding:IsExposed(hidingId, now)
+			local suspicionTier = SuspicionTier.fromValues(self._config, heat, exposed)
+			local previousSuspicionTier = self._lastSuspicionTiers[hidingId]
 			self._lastStates[hidingId] = result.state
 			self._lastRisk[hidingId] = result.risk
+			self._lastSuspicionTiers[hidingId] = suspicionTier
 			if
 				self._remotes ~= nil
-				and (
-					previous ~= result.state
-					or previousRisk == nil
-					or math.abs(previousRisk - result.risk) >= 0.04
+				and SuspicionSnapshotPolicy.shouldEmit(
+					previous,
+					result.state,
+					previousRisk,
+					result.risk,
+					previousSuspicionTier,
+					suspicionTier
 				)
 			then
 				for _, occupantId in ipairs(self._hiding:GetOccupants(hidingId)) do
@@ -68,8 +81,8 @@ function SilenceMonitor:Tick(elapsed: number, now: number)
 								risk = result.risk,
 								occupancy = self._hiding:GetOccupancy(hidingId),
 								capacity = spot.capacity,
-								heat = self._hiding:GetHeat(hidingId, now),
-								exposed = self._hiding:IsExposed(hidingId, now),
+								heat = heat,
+								exposed = exposed,
 							},
 						})
 					end

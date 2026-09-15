@@ -53,9 +53,9 @@ These modules avoid Roblox services so Lune can test their rules directly:
 - `InteractionBinder` creates native ProximityPrompts for hiding, doors, and extraction. Prompt events re-enter the same validated gateway as explicit remotes.
 - `RemoteGateway` rejects malformed, unknown, replayed, or excessive requests before dispatch.
 - `ActionService` re-checks round/player state, server-derived distance, occupancy, ownership, time, and availability before mutating a domain.
-- `RoundService`, `CaptureService`, `RescueMonitor`, `RescueInteractionService`, `DownedEvidenceService`, and `SilenceMonitor` own time-dependent transitions and contextual presentation.
-- `PlayerLifecycleService` translates character creation, death/reset, and player removal into one tested cleanup coordinator.
-- `HunterService` feeds visual, noise, and heat evidence into `HunterBrain`, inspects only locally reached exposed-or-hot hiding spots, and requests movement through a navigation provider.
+- `RoundService`, `CaptureService`, `RescueMonitor`, `RescueInteractionService`, `DownedEvidenceService`, and `SilenceMonitor` own time-dependent transitions and contextual presentation. `SilenceMonitor` treats suspicion-tier changes as snapshot boundaries instead of waiting for an unrelated risk delta.
+- `PlayerLifecycleService` translates character creation, death/reset, and player removal into one tested cleanup coordinator. `RoundPlayerReset` defines the fail-closed terminal reset plan; `PlayerStatePresentationService` executes it by relocating a secured live rig to `ArrivalSpawn` or reloading a dead/missing character before the new round.
+- `HunterService` feeds visual, noise, and heat evidence into `HunterBrain`, inspects only locally reached exposed-or-hot hiding spots, requests movement through a navigation provider, and resets both brain and physical rig to the authored start between rounds.
 - `NativeNavigationProvider` uses PathfindingService with cancellation, stuck detection, bounded replanning, and status reporting.
 - `CharacterPresentationService` conceals and immobilises hiding avatars on the server. `PlayerStatePresentationService` immobilises downed players, shows a bounded rescue marker, and makes eliminated/escaped/spectating characters non-physical and non-queryable. `DoorPresentationService` turns a server lease into a physical brace: the door is held shut while the helper is immobilised and exposed. `ExtractionRuntimeService` ejects hiders when extraction begins.
 - `MovementNoiseService` samples server-observed assembly velocity and floor material. `RobloxAnalyticsProvider` maps the allow-listed analytics bus to server-side `AnalyticsService` custom events without PII fields.
@@ -64,7 +64,7 @@ These modules avoid Roblox services so Lune can test their rules directly:
 
 ### `src/client`
 
-The client presents contextual actions. Roblox native prompts provide phone, keyboard, and controller affordances for world interactions. ContextActionService supplies large touch actions for exit, risky peek, decoy, spectator cycling, and the Let Me In accept/refuse decision. The Shared Silence panel renders immediate noise separately from persistent suspicion/heat. After subscribing to events, the client invokes a read-only state snapshot function so a startup race cannot strand it in stale spectator presentation. The client never calculates authoritative success.
+The client presents contextual actions. Roblox native prompts provide phone, keyboard, and controller affordances for world interactions. ContextActionService supplies large touch actions for exit, risky peek, decoy, spectator cycling, and the Let Me In accept/refuse decision. Let Me In has explicit context priority: it removes EXIT and PEEK controls while the decision is live, then restores them after resolution or expiry. The Shared Silence panel renders immediate noise separately from persistent suspicion/heat. After subscribing to events, the client invokes a read-only state snapshot function so a startup race cannot strand it in stale spectator presentation. The client never calculates authoritative success.
 
 ## Runtime ownership
 

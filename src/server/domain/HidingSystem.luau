@@ -110,6 +110,18 @@ function HidingSystem:GetOccupants(hidingId: string): { string }
 	return occupants
 end
 
+function HidingSystem:AddRecentNoise(hidingId: string, magnitude: number): (boolean, string?)
+	local spot = self._spots[hidingId]
+	if spot == nil then
+		return false, "unknown hiding spot"
+	end
+	if type(magnitude) ~= "number" or magnitude < 0 then
+		return false, "noise magnitude must be non-negative"
+	end
+	spot.recentNoise = math.min(1, spot.recentNoise + magnitude)
+	return true, nil
+end
+
 function HidingSystem:_enter(playerId: string, spot: any, now: number): any
 	spot.occupants[playerId] = true
 	spot.enteredAt[playerId] = now
