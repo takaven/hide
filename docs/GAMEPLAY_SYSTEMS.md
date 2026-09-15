@@ -32,13 +32,13 @@ An empty spot admits an eligible nearby survivor immediately. An occupied non-fu
 
 ## Hold the Door
 
-Tagged doors expose a one-tap prompt. A successful request creates a timed server lease with `heldBy`, `heldUntil`, and `exposedUntil`, emits door noise, prevents another survivor from stealing the lease, and enforces a cooldown. Phase 2 must connect the lease to the physical door animation/collision and validate the intended cooperative transition in playtests.
+Tagged doors expose a one-tap prompt. A successful request creates an eight-second server lease with `heldBy`, `heldUntil`, and `exposedUntil`, emits door noise, prevents another survivor from stealing the lease, and enforces a cooldown. The runtime opens the physical panel and removes collision only while the lease remains valid. The lease releases if the holder walks away or loses eligibility; a player cannot enter hiding while holding a door.
 
 ## Noise, heat, and decoys
 
 Noise events contain origin, magnitude, category, timestamp, decay, source IDs, hunter relevance, and a false-evidence flag. Magnitudes decay linearly and expire from memory. Categories weight hunter relevance.
 
-Repeated or prolonged hiding increases heat; heat cools over time. A decoy consumes a server-owned per-round use and enters the normal noise ledger as false evidence. The hunter decision path deliberately receives no privileged truth bit: false and real noises use the same scoring path.
+Repeated or prolonged hiding increases heat; heat cools over time. Server-observed character velocity emits footsteps at a bounded interval, with carpet/fabric quieter and metal/diamond plate louder. A one-use contextual storm-clicker decoy enters the normal noise ledger as false evidence. The hunter decision path deliberately receives no privileged truth bit: false and real noises use the same scoring path.
 
 ## The Listener
 
@@ -54,10 +54,10 @@ Character creation, death/reset, and player removal invoke one server coordinato
 
 ## Extraction and spectator foundation
 
-Extraction opens only in the Extraction phase and validates eligible state, point ID, server position, and distance. Escape transitions the player out of gameplay.
+Extraction opens only in the Extraction phase and validates eligible state, point ID, server position, and distance. When the phase begins, every hider is server-ejected, made visible, and returned to an eligible active state. The arrival cyclone gate is the single extraction objective; escape transitions the player out of gameplay.
 
-Spectators have no action path: the shared dispatcher rejects all gameplay requests before target-specific code. Phase 2 still needs a spectator camera and must ensure it reveals no hidden-player information.
+Spectators have no action path: the shared dispatcher rejects all gameplay requests before target-specific code. Their client camera is fixed to a map-wide observation point rather than following survivors. Hidden character parts are made transparent and non-collidable by the server, which prevents ordinary replication/free-camera observation from revealing an avatar; the server retains occupancy and authority.
 
 ## Analytics
 
-The provider-neutral server bus accepts only the declared Phase-1 event vocabulary. With no provider configured, events remain in an in-memory buffer. No third-party analytics package, secret, or network endpoint is included.
+The provider-neutral server bus accepts only the declared event vocabulary. The runtime provider sends bounded, server-originated Roblox `AnalyticsService` custom events with at most three non-PII fields. Studio logs confirm emission; production dashboard ingestion still requires a published experience.

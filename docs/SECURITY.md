@@ -22,6 +22,8 @@ Every gameplay request passes these controls in order:
 
 Native ProximityPrompt events do not bypass this boundary; `InteractionBinder` submits them through the same gateway.
 
+`GetStateSnapshot` is a read-only RemoteFunction used after client HUD subscription. It returns only the caller's current player state, the public round phase/deadline, and that caller's own hiding exit context. It accepts no client-supplied identity or target.
+
 ## Threat table
 
 | Threat | Control | Residual risk / Phase-2 validation |
@@ -33,8 +35,8 @@ Native ProximityPrompt events do not bypass this boundary; `InteractionBinder` s
 | Occupancy race / stale requester | Existence, proximity, state, authorization, and capacity are rechecked before an atomic state/occupancy commit | Roblox server callbacks are serialized between yields; domain mutation functions do not yield |
 | Fake rescue / rescue lockout | Target state, owner, range, time, disconnect, and completion expiry are checked continuously; lifecycle cleanup cancels attempts | Phase 2 must tune grace under real latency |
 | Fake decoy/reward | Server-owned use count; no client reward input | Inventory ownership is intentionally absent in MVP |
-| Spectator grief | Spectator-only states rejected before dispatch | Spectator UI/camera must not expose hidden locations |
-| Hunter oracle or fake exposure | No exposure remote exists; the server creates breach state and permits discovery only on a reached/near completed inspection | Hidden avatar replication still needs Phase-2 hardening |
+| Spectator grief | Spectator-only states rejected before dispatch; spectator camera is fixed rather than survivor-following | A determined exploiter can inspect replicated world structure, but hidden character parts are server-transparent and non-collidable |
+| Hunter oracle or fake exposure | No exposure remote exists; the server creates breach state and permits discovery only on a reached/near completed inspection | Tuning must ensure authored approach points do not create unfair through-wall captures |
 | Respawn ghost state | One lifecycle coordinator clears occupancy, door leases, rescue attempts, capture/context references | Phase 2 must test Roblox respawn settings and latency |
 | Remote replacement | Fixed folder/name/class assertions | Studio must not author conflicting remotes |
 | Analytics injection | Server-only allow-list | In-memory provider is non-durable by design |
@@ -52,7 +54,9 @@ No credentials, personal data, third-party endpoints, persistence, voice, or use
 
 Only placeholder names appear in `.env.example`: `ROBLOX_API_KEY`, `ROBLOX_UNIVERSE_ID`, and `ROBLOX_PLACE_ID`. CI has read-only repository contents permission and no deployment or Roblox secrets. Open Cloud publication remains deferred.
 
-## Security review priorities for Claude and Phase 2
+The Rojo place enables `HttpService.HttpEnabled` so the Studio automation plugin can communicate with its loopback bridge during development. No HIDE runtime module issues HTTP requests, and BloxForge was bound to localhost. Reassess and disable the place setting before production publication unless a reviewed runtime HTTP integration is added.
+
+## Runtime security validation priorities
 
 - Try concurrent accept/refuse requests against the last hiding slot.
 - Try changing player state or position between rescue start and completion, then verify a second rescuer can take over.
@@ -61,4 +65,6 @@ Only placeholder names appear in `.env.example`: `ROBLOX_API_KEY`, `ROBLOX_UNIVE
 - Verify a hidden or eliminated player cannot retain an old contextual action.
 - Verify prompt-trigger spam enters the same limiter as remote spam.
 - Exercise navigation cancellation and path blockage without accumulating connections.
-- Confirm physical doors and hiding transitions cannot desynchronise from server leases/state.
+- Confirm physical doors and hiding transitions cannot desynchronise from server leases/state under packet delay and rapid prompt use.
+- Attempt to reveal concealed characters through spectator mode, camera changes, collisions, accessories, particles, and nameplates on multiple clients.
+- Verify Roblox movement ownership cannot create arbitrary footstep evidence or impossible proximity actions without server position checks rejecting consequential actions.

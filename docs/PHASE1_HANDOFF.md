@@ -1,5 +1,7 @@
 # Phase-1 handoff for Claude delta review
 
+> Historical gate record: Phase 1 was approved and merged. Current Studio implementation evidence and remaining release risks are tracked in `docs/PHASE2_BUILD.md`.
+
 ## Review target
 
 - Repository: `https://github.com/takaven/hide`

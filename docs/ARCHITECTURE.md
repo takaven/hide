@@ -48,19 +48,22 @@ These modules avoid Roblox services so Lune can test their rules directly:
 
 ### `src/server/runtime`
 
+- `WorldBuilder` creates the compact fictional Le Morne resort, authored interaction points, patrol network, extraction gate, storm presentation, and original primitive Listener from repository code before world discovery.
 - `WorldRegistry` reads server-visible CollectionService tags and validates IDs, capacities, and positions.
 - `InteractionBinder` creates native ProximityPrompts for hiding, doors, and extraction. Prompt events re-enter the same validated gateway as explicit remotes.
 - `RemoteGateway` rejects malformed, unknown, replayed, or excessive requests before dispatch.
 - `ActionService` re-checks round/player state, server-derived distance, occupancy, ownership, time, and availability before mutating a domain.
-- `RoundService`, `CaptureService`, `RescueMonitor`, and `SilenceMonitor` own time-dependent transitions.
+- `RoundService`, `CaptureService`, `RescueMonitor`, `RescueInteractionService`, and `SilenceMonitor` own time-dependent transitions and contextual presentation.
 - `PlayerLifecycleService` translates character creation, death/reset, and player removal into one tested cleanup coordinator.
 - `HunterService` feeds visual, noise, and heat evidence into `HunterBrain`, inspects only locally reached exposed-or-hot hiding spots, and requests movement through a navigation provider.
 - `NativeNavigationProvider` uses PathfindingService with cancellation, stuck detection, bounded replanning, and status reporting.
+- `CharacterPresentationService` conceals and immobilises hiding avatars on the server; `DoorPresentationService` makes server leases physically open tagged doors; `ExtractionRuntimeService` ejects hiders when extraction begins.
+- `MovementNoiseService` samples server-observed assembly velocity and floor material. `RobloxAnalyticsProvider` maps the allow-listed analytics bus to server-side `AnalyticsService` custom events without PII fields.
 - `Remotes` creates a fixed set of remotes with class checks.
 
 ### `src/client`
 
-The client presents contextual actions. Roblox native prompts provide phone, keyboard, and controller affordances for world interactions. ContextActionService supplies large touch actions for exit and the Let Me In accept/refuse decision. The client never calculates authoritative success.
+The client presents contextual actions. Roblox native prompts provide phone, keyboard, and controller affordances for world interactions. ContextActionService supplies large touch actions for exit and the Let Me In accept/refuse decision. After subscribing to events, the client invokes a read-only state snapshot function so a startup race cannot strand it in stale spectator presentation. The client never calculates authoritative success.
 
 ## Runtime ownership
 
@@ -76,7 +79,7 @@ The client presents contextual actions. Roblox native prompts provide phone, key
 | Hunter sensing and navigation | Server | Presentation only |
 | Analytics | Server | None |
 
-## World contract for Phase 2
+## World contract and current map binding
 
 World construction is intentionally data-driven through tags and attributes:
 
@@ -88,7 +91,7 @@ World construction is intentionally data-driven through tags and attributes:
 | `HideHunter` | Model | Humanoid and HumanoidRootPart |
 | `HidePatrolPoint` | BasePart or Model | none |
 
-IDs are limited to 64 characters at the network boundary. Phase 2 must ensure uniqueness and create a Mauritius-inspired fictional resort greybox without embedding game logic in the place.
+IDs are limited to 64 characters at the network boundary. The current `WorldBuilder` supplies ten hiding spots, three doors, one extraction gate, eight patrol points, and one Listener. All ten hiding spots have authored `HiddenPoint` and `HunterApproach` parts. A later art pass may replace geometry while preserving these tags, attributes, and identifiers.
 
 `HunterApproach` is the navigation-safe inspection point outside a wardrobe, bed, or cabinet. If absent, the hiding pivot is the fallback. Navigation completion, failure, cancellation, and investigation timeout are distinct brain inputs; failure never masquerades as arrival. Every movement command has a generation, and a new investigation binds the generation created for its own forced `MoveTo`. Only matching-generation arrival/completion can authorize inspection.
 
@@ -103,5 +106,5 @@ CI applies Luau analysis with the pinned Roblox definitions and Rojo sourcemap t
 - No persistence, economy, shop, rewards, inventory framework, or monetisation.
 - No additional hunter implementation: native navigation must first fail in measured Studio tests.
 - No dynamic remote factory exposed to feature code.
-- No finished map or Studio-authored scripts.
-- No Open Cloud deployment in Phase 1.
+- No Studio-authored gameplay scripts or unpublished source-of-truth mutations.
+- No Open Cloud deployment or production place publication in this branch.
