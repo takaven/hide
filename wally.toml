@@ -1,0 +1,9 @@
+[package]
+name = "takaven/hide"
+description = "Server-authoritative gameplay foundation for HIDE! by TAKAVEN"
+version = "0.1.0"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+private = true
+
+[dependencies]

@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main, phase-1/core-foundation]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install pinned Roblox toolchain
+        uses: roblox-ts/setup-rokit@v0.1.2
+
+      - name: Resolve package manifest
+        run: wally install
+
+      - name: Check formatting
+        run: stylua --check src tests scripts
+
+      - name: Lint
+        run: selene src tests scripts
+
+      - name: Generate Rojo sourcemap
+        run: |
+          mkdir -p build
+          rojo sourcemap default.project.json --output sourcemap.json
+          curl -fsSL https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/1.69.0/scripts/globalTypes.d.luau -o build/globalTypes.d.luau
+
+      - name: Static analysis of shared and server domain code
+        run: luau-lsp analyze --definitions=build/globalTypes.d.luau --sourcemap=sourcemap.json src/shared src/server/domain
+
+      - name: Unit and adversarial tests
+        run: lune run tests/run.luau
+
+      - name: Validate repository structure
+        run: lune run scripts/validate-structure.luau
+
+      - name: Reject tracked secrets and build artifacts
+        shell: bash
+        run: |
+          tracked=$(git ls-files | grep -E '(^|/)(\.env($|\.)|credentials\.json|secrets\.|.*\.(pem|p12|pfx|rbxl|rbxlx|rbxm|rbxmx)$)' | grep -vE '(^|/)\.env\.example$' || true)
+          if [ -n "$tracked" ]; then
+            echo "$tracked"
+            echo "Tracked secret-like or binary Roblox artifact detected"
+            exit 1
+          fi
+
+      - name: Build place model
+        run: |
+          mkdir -p build
+          rojo build default.project.json --output build/hide.rbxlx
