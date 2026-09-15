@@ -14,6 +14,10 @@ function SilenceMonitor.new(hiding: any, noise: any, analytics: any)
 	}, SilenceMonitor)
 end
 
+function SilenceMonitor:ResetRound()
+	self._lastStates = {}
+end
+
 function SilenceMonitor:_movementFactor(hidingId: string): number
 	local maximum = 0
 	for _, playerId in ipairs(self._hiding:GetOccupants(hidingId)) do

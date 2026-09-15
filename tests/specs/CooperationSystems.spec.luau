@@ -19,6 +19,8 @@ return {
 		Assert.contains(stolenError, "already held")
 		Assert.equal(#doors:Tick(Config.Door.HoldDuration + 0.1), 1)
 		Assert.truthy(doors:Hold("p2", "service-door", 5))
+		doors:ResetRound()
+		Assert.equal(doors:Get("service-door").heldBy, nil)
 
 		local rescue = RescueSystem.new(Config)
 		local attempt = rescue:Start("p1", "p2", 0, 5, "Active", "Downed")
@@ -30,6 +32,8 @@ return {
 			rescue:Complete("p1", attempt.id, Config.Rescue.Duration, 5, "Active", "Downed")
 		Assert.equal(completed.status, "Completed")
 		Assert.truthy(completed.noiseMagnitude > 0)
+		rescue:ResetRound()
+		Assert.equal(rescue:Get(attempt.id), nil)
 		local selfRescue = rescue:Start("p1", "p1", 10, 0, "Active", "Downed")
 		Assert.equal(selfRescue, nil)
 
@@ -41,5 +45,7 @@ return {
 		local escaped = extraction:Escape("p1", "lobby-exit", 11, 1, "Active")
 		Assert.equal(escaped.status, "Escaped")
 		Assert.equal(extraction:Escape("p2", "lobby-exit", 11, 100, "Active"), nil)
+		extraction:ResetRound()
+		Assert.falsy(extraction:IsOpen(12))
 	end,
 }

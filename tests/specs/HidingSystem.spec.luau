@@ -37,5 +37,9 @@ return {
 		Assert.equal(hiding:GetOccupancy("wardrobe-a"), 1)
 		local retry = hiding:RequestEntry("p3", "wardrobe-a", 21)
 		Assert.equal(retry.status, "Pending")
+		hiding:ResetRound()
+		Assert.equal(hiding:GetOccupancy("wardrobe-a"), 0)
+		Assert.equal(hiding:GetPlayerSpot("p1"), nil)
+		Assert.equal(hiding:GetHeat("wardrobe-a", 22), 0)
 	end,
 }

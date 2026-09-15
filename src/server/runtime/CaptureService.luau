@@ -21,6 +21,11 @@ function CaptureService.new(
 	}, CaptureService)
 end
 
+function CaptureService:ResetRound()
+	self._deadlines = {}
+	self._lastCapture = {}
+end
+
 function CaptureService:Down(playerId: string, now: number): (boolean, string?)
 	local lastCapture = self._lastCapture[playerId]
 	if lastCapture ~= nil and now - lastCapture < self._config.Hunter.CaptureCooldown then

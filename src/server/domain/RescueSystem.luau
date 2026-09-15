@@ -7,6 +7,11 @@ function RescueSystem.new(config: any)
 	return setmetatable({ _config = config, _attempts = {}, _nextId = 0 }, RescueSystem)
 end
 
+function RescueSystem:ResetRound()
+	self._attempts = {}
+	self._nextId = 0
+end
+
 function RescueSystem:Get(attemptId: string): any?
 	return self._attempts[attemptId]
 end

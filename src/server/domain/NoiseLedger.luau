@@ -22,6 +22,11 @@ function NoiseLedger.new(config: any)
 	}, NoiseLedger)
 end
 
+function NoiseLedger:ResetRound()
+	self._events = {}
+	self._nextId = 0
+end
+
 function NoiseLedger:Add(input: any, now: number): (any?, string?)
 	if type(input) ~= "table" then
 		return nil, "noise input must be a table"

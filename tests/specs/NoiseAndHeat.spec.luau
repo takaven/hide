@@ -25,6 +25,8 @@ return {
 		local invalid, err = ledger:Add({ origin = {}, magnitude = 1, category = "Magic" }, 0)
 		Assert.equal(invalid, nil)
 		Assert.contains(err, "unknown")
+		ledger:ResetRound()
+		Assert.equal(#ledger:GetEvidence(12), 0)
 
 		local heat = HidingHeat.new(Config.HidingHeat)
 		local used = heat:RecordUse("wardrobe-a", 0)

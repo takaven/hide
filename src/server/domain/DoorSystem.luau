@@ -7,6 +7,14 @@ function DoorSystem.new(config: any)
 	return setmetatable({ _config = config, _doors = {}, _lastHeld = {} }, DoorSystem)
 end
 
+function DoorSystem:ResetRound()
+	for _, door in pairs(self._doors) do
+		door.heldBy = nil
+		door.heldUntil = nil
+	end
+	self._lastHeld = {}
+end
+
 function DoorSystem:Register(doorId: string, position: any): (boolean, string?)
 	if type(doorId) ~= "string" or doorId == "" then
 		return false, "invalid door id"

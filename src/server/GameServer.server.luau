@@ -94,7 +94,12 @@ local actionService = ActionService.new({
 local gateway = RemoteGateway.new(Config, remotes, actionService)
 local interactions = InteractionBinder.new(Config, world, gateway)
 local silence = SilenceMonitor.new(hiding, noise, analytics)
-local hunter = HunterService.new(Config, world, playerStates, hiding, noise, capture, analytics)
+local hunter =
+	HunterService.new(Config, world, playerStates, hiding, noise, capture, analytics, round)
+
+for _, resetter in ipairs({ hiding, doors, rescue, extraction, noise, capture, silence }) do
+	round:AddResetter(resetter)
+end
 
 gateway:Start()
 interactions:BindAll()

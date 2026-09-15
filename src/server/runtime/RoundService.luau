@@ -21,11 +21,19 @@ function RoundService.new(
 		_state = RoundState.new(config.Round, now),
 		_playerStates = playerStates,
 		_extraction = extraction,
-		_decoys = decoys,
 		_analytics = analytics,
 		_remotes = remotes,
 		_running = false,
+		_resetters = { decoys },
 	}, RoundService)
+end
+
+function RoundService:AddResetter(resetter: any)
+	assert(
+		type(resetter) == "table" and type(resetter.ResetRound) == "function",
+		"round resetter must expose ResetRound"
+	)
+	table.insert(self._resetters, resetter)
 end
 
 function RoundService:GetState(): string
@@ -46,8 +54,10 @@ function RoundService:_advance(nextState: string, now: number): boolean
 		return false
 	end
 	if nextState == "Prepare" then
+		for _, resetter in ipairs(self._resetters) do
+			resetter:ResetRound()
+		end
 		self._playerStates:ResetForRound(self:_playerIds(), now)
-		self._decoys:ResetRound()
 		self._analytics:Emit("round_started", { playerCount = #Players:GetPlayers() }, now)
 	elseif nextState == "Extraction" then
 		self._extraction:Open(now)

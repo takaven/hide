@@ -10,6 +10,11 @@ function ExtractionSystem.new(config: any)
 	)
 end
 
+function ExtractionSystem:ResetRound()
+	self._openedAt = nil
+	self._closedAt = nil
+end
+
 function ExtractionSystem:Register(extractionId: string, position: any): (boolean, string?)
 	if type(extractionId) ~= "string" or extractionId == "" then
 		return false, "invalid extraction id"

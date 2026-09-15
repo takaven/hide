@@ -27,6 +27,18 @@ function HidingSystem.new(config: any)
 	}, HidingSystem)
 end
 
+function HidingSystem:ResetRound()
+	for _, spot in pairs(self._spots) do
+		spot.occupants = {}
+		spot.recentNoise = 0
+		spot.movementFactor = 0
+	end
+	self._playerSpot = {}
+	self._requests = {}
+	self._nextRequestId = 0
+	self._heat = HidingHeat.new(self._config.HidingHeat)
+end
+
 function HidingSystem:Register(
 	hidingId: string,
 	capacity: number?,

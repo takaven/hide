@@ -17,7 +17,8 @@ function HunterService.new(
 	hiding: any,
 	noise: any,
 	capture: any,
-	analytics: any
+	analytics: any,
+	round: any
 )
 	return setmetatable({
 		_config = config,
@@ -27,6 +28,7 @@ function HunterService.new(
 		_noise = noise,
 		_capture = capture,
 		_analytics = analytics,
+		_round = round,
 		_brain = HunterBrain.new(config.Hunter),
 		_hunter = nil,
 		_navigation = nil,
@@ -36,6 +38,7 @@ function HunterService.new(
 		_patrolTarget = nil,
 		_lastSeenPlayerId = nil,
 		_lastEvidenceId = nil,
+		_lastRoundPhase = nil,
 	}, HunterService)
 end
 
@@ -139,6 +142,24 @@ function HunterService:Start(): (boolean, string?)
 end
 
 function HunterService:Tick(now: number)
+	local phase = self._round:GetState()
+	local active = phase == "Hunt" or phase == "Relocation" or phase == "Extraction"
+	if not active then
+		if self._lastRoundPhase ~= phase then
+			if self._navigation ~= nil and self._navigation:GetStatus() ~= "Idle" then
+				self._navigation:Cancel()
+			end
+			self._brain = HunterBrain.new(self._config.Hunter)
+			self._lastTarget = nil
+			self._patrolTarget = nil
+			self._lastEvidenceId = nil
+			self._lastSeenPlayerId = nil
+		end
+		self._lastRoundPhase = phase
+		return
+	end
+	self._lastRoundPhase = phase
+
 	local root = self:_root()
 	if root == nil or self._navigation == nil then
 		return
