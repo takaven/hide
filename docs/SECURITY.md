@@ -30,18 +30,19 @@ Native ProximityPrompt events do not bypass this boundary; `InteractionBinder` s
 | Replay | Per-player request-ID window | A new unique malicious request is still subject to state, range, and rate checks |
 | Forged target or action | Fixed schemas and server registries | Phase 2 must keep tag IDs unique |
 | Teleport/proximity spoof | Server reads character pivot at action time | Roblox movement ownership still permits movement exploits; add displacement heuristics only after measuring false positives |
-| Occupancy race | Capacity rechecked when occupant resolves | Roblox server callbacks are serialized between yields; domain mutation functions do not yield |
-| Fake rescue | Target state, identity, time, and start/end distance checks | Interruption on damage/disconnect should be playtested |
+| Occupancy race / stale requester | Existence, proximity, state, authorization, and capacity are rechecked before an atomic state/occupancy commit | Roblox server callbacks are serialized between yields; domain mutation functions do not yield |
+| Fake rescue / rescue lockout | Target state, owner, range, time, disconnect, and completion expiry are checked continuously; lifecycle cleanup cancels attempts | Phase 2 must tune grace under real latency |
 | Fake decoy/reward | Server-owned use count; no client reward input | Inventory ownership is intentionally absent in MVP |
 | Spectator grief | Spectator-only states rejected before dispatch | Spectator UI/camera must not expose hidden locations |
-| Hunter oracle | Server creates sight/noise/heat evidence | Basic vision and movement require Studio playtests |
+| Hunter oracle or fake exposure | No exposure remote exists; the server creates breach state and permits discovery only on a reached/near completed inspection | Hidden avatar replication still needs Phase-2 hardening |
+| Respawn ghost state | One lifecycle coordinator clears occupancy, door leases, rescue attempts, capture/context references | Phase 2 must test Roblox respawn settings and latency |
 | Remote replacement | Fixed folder/name/class assertions | Studio must not author conflicting remotes |
 | Analytics injection | Server-only allow-list | In-memory provider is non-durable by design |
 | Secret exposure | `.gitignore`, placeholders, read-only CI permissions, no deploy job | Repository history must still be reviewed before visibility changes |
 
 ## Denial-of-service considerations
 
-Input sizes are bounded. Unknown keys fail closed. Noise magnitude and category are validated. Pathfinding is limited to one hunter, a configured replan interval, stuck timeout, and maximum retries. Hiding requests are single-pending per requester and expire. Long-lived dictionaries are bounded by player/action cardinality or pruned by time during access.
+Input sizes are bounded. Unknown keys fail closed. Noise magnitude and category are validated. Pathfinding is limited to one hunter, a configured replan interval, stuck timeout, maximum retries, and an investigation deadline. Failed evidence is ignored for the local search interval, preventing immediate infinite retry. Hiding requests are indexed one-per-requester and removed on terminal/expiry paths. Rescue attempts expire and are cleared each round.
 
 ## Data and privacy
 
@@ -54,7 +55,9 @@ Only placeholder names appear in `.env.example`: `ROBLOX_API_KEY`, `ROBLOX_UNIVE
 ## Security review priorities for Claude and Phase 2
 
 - Try concurrent accept/refuse requests against the last hiding slot.
-- Try changing player state or position between rescue start and completion.
+- Try changing player state or position between rescue start and completion, then verify a second rescuer can take over.
+- Try resetting, respawning, or disconnecting while hiding, holding a door, rescuing, or downed.
+- Verify a Broken spot is discoverable only after local hunter arrival and resets across rounds.
 - Verify a hidden or eliminated player cannot retain an old contextual action.
 - Verify prompt-trigger spam enters the same limiter as remote spam.
 - Exercise navigation cancellation and path blockage without accumulating connections.

@@ -1,26 +1,40 @@
-# Phase-1 handoff for Claude review
+# Phase-1 handoff for Claude delta review
 
 ## Review target
 
 - Repository: `https://github.com/takaven/hide`
 - Branch: `phase-1/core-foundation`
-- Base: `main`
-- Scope: GitHub/source foundation only; do not enter Roblox Studio during this review.
+- Pull request: `#1`
+- Claude-reviewed baseline: `2e7c4df2bc2bb8333836a0a94a36292eccdb52e1`
+- Scope: review the remediation delta only. Phase 2 remains closed; do not merge or enter Roblox Studio.
 
-## What is implemented
+## Claude gate provenance
 
-- Complete configurable round and player transition graphs.
-- Shared Silence risk, occupancy, movement input, local noise, and hiding heat.
-- Let Me In request, accept/refuse, expiry, authorization, and capacity race checks.
-- Timed Hold the Door lease and exposed interval foundation.
-- Validated decaying evidence ledger with decoys on the same hunter path.
-- Downed/capture limit, rescue timing, start/end proximity, and timeout elimination.
+Claude returned **PASS WITH REMEDIATION** and identified three blockers plus three mandatory material findings. This branch addresses them without adding unrelated gameplay scope.
+
+| Finding | Remediation |
+|---|---|
+| B1: Broken hiding had no consequence | A Broken transition creates a timed server-owned compromise. The Listener discovers occupants only after an arrived or near-completed inspection at the spot approach point. |
+| B2: rescue lockout | Live ownership now cancels on disconnect, state loss, target loss/recovery, range-grace expiry, completion-window expiry, player lifecycle cleanup, and round reset. |
+| B3: INVESTIGATE deadlock | Investigation timeout and explicit Completed/Failed/Cancelled navigation outcomes always lead to SEARCH. Failed evidence receives a bounded retry suppression. |
+| M1: Let Me In mutation order | Requester existence, proximity, and state are checked before the state-transition/occupancy commit. No rollback noise, heat, occupancy, or accepted analytics remain. |
+| M4: character lifecycle | A tested coordinator cleans hiding, doors, rescue, capture, contextual state, and legal player-state recovery on recreation, death/reset, and removal. |
+| M6: narrow static analysis | CI now analyses all shared and server-domain Luau using the Rojo sourcemap and pinned Roblox definitions. |
+
+## Implemented foundation
+
+- Configurable round and player transition graphs.
+- Shared Silence risk, occupancy, movement input, local noise, hiding heat, timed compromise, and local hunter inspection.
+- Let Me In request, accept/refuse, expiry/pruning, authorization, atomic admission, and capacity checks.
+- Timed Hold the Door lease with lifecycle release.
+- Validated decaying evidence ledger with decoys on the same evidence scoring path.
+- Downed/capture limits and rescue lifecycle with reclaimable ownership.
 - Extraction gating and spectator action denial.
-- The Listener evidence/state brain, server visibility, and replaceable native navigation.
-- Fixed remotes, schema validation, extra-field rejection, per-action rate limits, replay defense, state checks, and server-derived proximity.
+- The Listener evidence/state brain, explicit navigation outcomes, approach points, and replaceable native navigation.
+- Fixed remotes, schema validation, extra-field rejection, action limits, replay defense, state checks, and server-derived proximity.
 - Provider-neutral allow-listed analytics.
-- Native mobile/keyboard/controller prompts and large Let Me In decision actions.
-- Pinned toolchain, CI, deterministic tests, structural validation, and Rojo build.
+- Native mobile/keyboard/controller interaction foundation.
+- Pinned toolchain, expanded static analysis, behavioural tests, structural validation, and Rojo build.
 
 ## Reproduce validation
 
@@ -30,58 +44,57 @@ wally install
 stylua --check src tests scripts
 selene src tests scripts
 rojo sourcemap default.project.json --output sourcemap.json
-luau-lsp analyze --platform=standard src/shared
+mkdir -p build
+curl -fsSL https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/1.69.0/scripts/globalTypes.d.luau -o build/globalTypes.d.luau
+luau-lsp analyze --definitions=build/globalTypes.d.luau --sourcemap=sourcemap.json src/shared src/server/domain
 lune run tests/run.luau
 lune run scripts/validate-structure.luau
-mkdir -p build
 rojo build default.project.json --output build/hide.rbxlx
 ```
 
-CI also rejects tracked secret-like files and binary Roblox place/model artifacts.
+Runtime adapters are not yet included in luau-lsp analysis because their injected Roblox service shapes are intentionally dynamic. They remain subject to full formatting/lint parsing, extracted-domain tests, structural validation, and Rojo build. Formalising those shapes is preferable to suppressing diagnostics.
 
-## Adversarial review prompts
+## Delta-review attack list
 
-1. Can a client create an outcome by forging action, target, accepted value, position, elapsed time, or extra reward fields?
-2. Can concurrent Let Me In resolutions exceed capacity or admit an ineligible requester?
-3. Can a spectator, escaped player, eliminated player, or stale contextual button influence the round?
-4. Does Shared Silence actually make the second and third occupant riskier under plausible noise/heat?
-5. Can decoy evidence be distinguished by The Listener's scoring path when it should not be?
-6. Can navigation replan without bounds, hang on MoveToFinished, or retain blocked connections?
-7. Do the tests assert behavior rather than implementation trivia?
-8. Is any audited code copied without notice, or any unlicensed source reused?
-9. Has a Studio-dependent claim been overstated as complete?
+1. Keep one player still in a quiet spot, then add second/third occupants and verify risk rises.
+2. Break a spot, wait for The Listener to reach its `HunterApproach`, and verify occupants are discoverable only within the compromise window.
+3. Attempt to invent exposure/immunity through remote payloads; no such client action exists.
+4. Walk away, disconnect, become downed/eliminated, recover the target, and exceed rescue timing; verify ownership cancels and another rescuer can take over.
+5. Return Failed, Cancelled, Completed-near, Completed-far, and no result from navigation; verify INVESTIGATE cannot persist beyond timeout.
+6. Down the requester while Let Me In is pending; acceptance must not change occupancy, heat, noise, or analytics.
+7. Recreate/remove a character while hiding, holding a door, rescuing, or downed; verify no ghost interaction state survives.
+8. Introduce an obvious type error under `src/server/domain`; CI static analysis must fail.
+9. Reset a round with compromise, rescue, and investigation active; each domain must return to its clean initial state.
 
-## Explicit Studio-dependent work
+## Required early Phase-2 work
 
-Phase 2 must:
+These are explicit gate inputs, not completed Phase-1 claims:
 
-- create one fictional Mauritius-inspired resort greybox;
-- add unique tagged hiding spots, doors, extraction points, one Listener model, and patrol points using the contract in `ARCHITECTURE.md`;
-- connect hiding state to character visibility/collision/position without moving authority client-side;
-- connect door leases to physical door animation/collision and cooperative passage;
-- provide contextual rescue and decoy affordances;
-- implement a safe spectator camera that reveals no hidden locations;
-- playtest touch target placement on multiple phone aspect ratios;
-- tune phase lengths, silence thresholds, evidence weights, speeds, and path agent parameters;
-- exercise server/client multi-player races, disconnects, respawns, and latency;
-- add screenshots, logs, and measured playtest findings;
-- prepare staging IDs and Open Cloud credentials outside the repository only after approval.
+- **Movement noise:** connect real server-observed character movement and surface behaviour to Footstep/environment evidence.
+- **Hold the Door physical consequence:** bind the lease to real collision/animation/path passage and verify the helper remains exposed longer.
+- **Hidden-character information security:** prevent replicated avatar presence, spectator cameras, and exploit freecams from trivially revealing hidden players.
+- **Hunter chase tuning:** implement and playtest lost-sight grace plus bounded local search/wander rather than immediate simplistic fallback.
+- **Gameplay analytics:** add Studio-backed measures for shared occupancy duration, acceptance/refusal context, rescue abandonment, breach-to-discovery, door sacrifice, chase outcomes, and quit timing.
+- Build one fictional Mauritius-inspired resort greybox with unique tagged hiding, door, extraction, hunter, patrol, and optional `HunterApproach` instances.
+- Connect hiding/downed state to character collision, positioning, animation, and presentation without moving authority client-side.
+- Provide contextual rescue/decoy actions and a safe spectator camera.
+- Tune touch targets, timing, thresholds, evidence weights, speeds, and path agent settings under multiplayer latency.
+- Prepare staging identifiers and Open Cloud credentials outside the repository only after Phase-2 approval.
 
-## Known limitations
+## Known limitations and risks
 
-- The named primary reference `oh-ashen-one/roblox-infected` was unavailable (GitHub 404), so it could not be audited. No claims about its internals are made.
-- Phase 1 has not been executed in Roblox Studio and does not claim an end-to-end playable place.
-- Hold the Door is a validated timed lease, not yet a physical door implementation.
-- Rescue and decoy have server contracts but need Phase-2 contextual world/UI binding.
-- Spectator enforcement exists; spectator camera presentation does not.
-- The Listener uses basic raycast vision and native path defaults; map-specific tuning is intentionally deferred.
-- Analytics is in-memory until a provider and privacy/retention policy are selected.
-- No rewards exist; adding them would require a new server-owned and tested domain.
+- The named reference `oh-ashen-one/roblox-infected` remained unavailable (GitHub 404); no claims about its internals or licence were fabricated.
+- Phase 1 has not run in Roblox Studio and is not an end-to-end playable place.
+- Hold the Door remains a domain lease until physical Studio binding.
+- Hidden avatar replication and spectator presentation are unresolved information-security work.
+- The Listener needs map-specific path, visibility, lost-sight, and local-search tuning.
+- Runtime adapters are not yet fully statically typed; shared contracts and all deterministic server domains are analysed.
+- Analytics remains in memory pending a provider, privacy design, and expanded gameplay schema.
 
 ## Phase-2 automation recommendation
 
-Use Rojo as the non-negotiable source-of-truth bridge. BloxForge is the recommended optional automation layer because its current public implementation supports Codex/Claude MCP clients, Instance editing, Rojo-aware source ownership, playtests, screenshots, logs, mutation plans, and rollback. Re-review the installed version before use, run locally with the narrowest appropriate capability profile, and do not let Studio changes replace repository logic.
+Rojo remains the mandatory source-of-truth bridge. BloxForge is the optional automation recommendation because its public implementation supports MCP clients, Instance editing, Rojo-aware ownership, playtests, screenshots, logs, mutation plans, and rollback. Re-audit the installed version at Phase-2 start and use the narrowest capability profile.
 
-## Remaining blockers
+## Gate state
 
-There are no known blockers to independent source review. Studio validation is a deliberate Phase-2 gate, not a Phase-1 completion claim.
+This remediation returns PR #1 for Claude delta review. It does **not** approve Phase 2, merge the PR, publish a Roblox place, or claim Studio validation.

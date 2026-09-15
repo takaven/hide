@@ -26,8 +26,7 @@ mobile / keyboard / controller input
 
 - `Config.luau` is the single balance surface for players, phases, proximity, Shared Silence, noise, heat, doors, rescue, decoys, extraction, The Listener, and remote controls.
 - `ConfigValidator.luau` rejects missing, non-finite, negative, or contradictory settings at server startup and in tests.
-- `RemoteProtocol.luau` declares the only accepted client action names and target fields.
-- `StateDefinitions.luau` declares round, player, and hunter transition graphs.
+- `RemoteProtocol.luau` and `ActionValidator.luau` declare and validate the only accepted client action shapes.
 
 Shared code contains contracts, not authority. A client knowing a threshold cannot grant itself an outcome.
 
@@ -36,11 +35,12 @@ Shared code contains contracts, not authority. A client knowing a threshold cann
 These modules avoid Roblox services so Lune can test their rules directly:
 
 - state machines for rounds, players, and The Listener;
+- authoritative character lifecycle cleanup across hiding, doors, rescue, and capture;
 - Shared Silence risk calculation;
 - hiding occupancy, Let Me In requests, acceptance/refusal, and heat;
 - noise creation, validation, decay, and evidence projection;
 - Hold the Door leases;
-- rescue attempts and completion timing;
+- rescue attempts, ownership, cancellation, range grace, and completion expiry;
 - decoy allocation and false evidence;
 - extraction availability;
 - rate limiting, replay protection, payload validation;
@@ -52,8 +52,9 @@ These modules avoid Roblox services so Lune can test their rules directly:
 - `InteractionBinder` creates native ProximityPrompts for hiding, doors, and extraction. Prompt events re-enter the same validated gateway as explicit remotes.
 - `RemoteGateway` rejects malformed, unknown, replayed, or excessive requests before dispatch.
 - `ActionService` re-checks round/player state, server-derived distance, occupancy, ownership, time, and availability before mutating a domain.
-- `RoundService`, `CaptureService`, and `SilenceMonitor` own time-dependent transitions.
-- `HunterService` feeds visual, noise, and heat evidence into `HunterBrain` and requests movement through a navigation provider.
+- `RoundService`, `CaptureService`, `RescueMonitor`, and `SilenceMonitor` own time-dependent transitions.
+- `PlayerLifecycleService` translates character creation, death/reset, and player removal into one tested cleanup coordinator.
+- `HunterService` feeds visual, noise, and heat evidence into `HunterBrain`, inspects only reached compromised hiding spots, and requests movement through a navigation provider.
 - `NativeNavigationProvider` uses PathfindingService with cancellation, stuck detection, bounded replanning, and status reporting.
 - `Remotes` creates a fixed set of remotes with class checks.
 
@@ -81,13 +82,19 @@ World construction is intentionally data-driven through tags and attributes:
 
 | Tag | Instance | Required attributes |
 |---|---|---|
-| `HideHidingSpot` | BasePart or Model | `HidingId: string`, `Capacity: integer >= 1` |
+| `HideHidingSpot` | BasePart or Model | `HidingId: string`, `Capacity: integer >= 1`; optional descendant BasePart/Attachment named `HunterApproach` |
 | `HideDoor` | BasePart or Model | `DoorId: string` |
 | `HideExtraction` | BasePart or Model | `ExtractionId: string` |
 | `HideHunter` | Model | Humanoid and HumanoidRootPart |
 | `HidePatrolPoint` | BasePart or Model | none |
 
 IDs are limited to 64 characters at the network boundary. Phase 2 must ensure uniqueness and create a Mauritius-inspired fictional resort greybox without embedding game logic in the place.
+
+`HunterApproach` is the navigation-safe inspection point outside a wardrobe, bed, or cabinet. If absent, the hiding pivot is the fallback. Navigation completion, failure, cancellation, and investigation timeout are distinct brain inputs; failure never masquerades as arrival.
+
+## Static-analysis boundary
+
+CI applies Luau analysis with the pinned Roblox definitions and Rojo sourcemap to all of `src/shared` and `src/server/domain`. Runtime adapters remain covered by StyLua, Selene, tests through extracted domains, and a full Rojo build. Wider runtime type analysis is deferred until the dependency-injected Roblox service shapes are formalised; pretending those dynamic adapters are fully typed would weaken rather than strengthen the gate.
 
 ## Deliberate non-decisions
 

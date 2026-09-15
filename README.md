@@ -24,7 +24,9 @@ wally install
 stylua --check src tests scripts
 selene src tests scripts
 lune run tests/run.luau
-luau-lsp analyze --platform=standard src/shared
+rojo sourcemap default.project.json --output sourcemap.json
+# download luau-lsp 1.69.0 globalTypes.d.luau to build/globalTypes.d.luau
+luau-lsp analyze --definitions=build/globalTypes.d.luau --sourcemap=sourcemap.json src/shared src/server/domain
 lune run scripts/validate-structure.luau
 rojo build default.project.json -o build/hide.rbxlx
 ```
