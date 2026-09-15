@@ -35,6 +35,7 @@ function HidingSystem:ResetRound()
 		spot.recentNoise = 0
 		spot.movementFactor = 0
 		spot.exposedUntil = 0
+		spot.enteredAt = {}
 	end
 	self._playerSpot = {}
 	self._requests = {}
@@ -65,6 +66,7 @@ function HidingSystem:Register(
 		position = position,
 		approachPosition = approachPosition or position,
 		occupants = {},
+		enteredAt = {},
 		recentNoise = 0,
 		movementFactor = 0,
 		exposedUntil = 0,
@@ -110,6 +112,7 @@ end
 
 function HidingSystem:_enter(playerId: string, spot: any, now: number): any
 	spot.occupants[playerId] = true
+	spot.enteredAt[playerId] = now
 	self._playerSpot[playerId] = spot.id
 	self._heat:RecordUse(spot.id, now)
 	spot.recentNoise = math.min(1, spot.recentNoise + self._config.Hiding.EntryNoise)
@@ -125,6 +128,19 @@ function HidingSystem:_removeRequest(request: any)
 	if self._pendingByPlayer[request.playerId] == request.id then
 		self._pendingByPlayer[request.playerId] = nil
 	end
+end
+
+function HidingSystem:PruneExpired(now: number): { any }
+	local expired = {}
+	for _, request in pairs(self._requests) do
+		if request.status == "Pending" and now > request.expiresAt then
+			table.insert(expired, request)
+		end
+	end
+	for _, request in ipairs(expired) do
+		self:_removeRequest(request)
+	end
+	return expired
 end
 
 function HidingSystem:_pendingRequest(playerId: string, now: number): any?
@@ -232,7 +248,7 @@ function HidingSystem:ResolveEntry(
 	return result, nil
 end
 
-function HidingSystem:Exit(playerId: string, hidingId: string): (any?, string?)
+function HidingSystem:Exit(playerId: string, hidingId: string, now: number?): (any?, string?)
 	local spot = self._spots[hidingId]
 	if
 		spot == nil
@@ -243,8 +259,16 @@ function HidingSystem:Exit(playerId: string, hidingId: string): (any?, string?)
 	end
 	spot.occupants[playerId] = nil
 	self._playerSpot[playerId] = nil
+	local enteredAt = spot.enteredAt[playerId]
+	spot.enteredAt[playerId] = nil
 	spot.recentNoise = math.min(1, spot.recentNoise + self._config.Hiding.ExitNoise)
-	return { status = "Exited", hidingId = hidingId, noiseMagnitude = self._config.Hiding.ExitNoise },
+	return {
+		status = "Exited",
+		hidingId = hidingId,
+		noiseMagnitude = self._config.Hiding.ExitNoise,
+		duration = if now and enteredAt then math.max(0, now - enteredAt) else 0,
+		occupancyAfter = count(spot.occupants),
+	},
 		nil
 end
 
@@ -254,6 +278,7 @@ function HidingSystem:RemovePlayer(playerId: string): any
 		local spot = self._spots[hidingId]
 		if spot ~= nil then
 			spot.occupants[playerId] = nil
+			spot.enteredAt[playerId] = nil
 		end
 		self._playerSpot[playerId] = nil
 	end

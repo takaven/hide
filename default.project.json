@@ -3,12 +3,6 @@
   "serveAddress": "127.0.0.1",
   "tree": {
     "$className": "DataModel",
-    "HttpService": {
-      "$className": "HttpService",
-      "$properties": {
-        "HttpEnabled": true
-      }
-    },
     "ReplicatedStorage": {
       "$className": "ReplicatedStorage",
       "Hide": {

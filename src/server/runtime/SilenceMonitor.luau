@@ -36,6 +36,12 @@ function SilenceMonitor:_movementFactor(hidingId: string): number
 end
 
 function SilenceMonitor:Tick(elapsed: number, now: number)
+	for _, request in ipairs(self._hiding:PruneExpired(now)) do
+		self._analytics:Emit("entry_request_expired", {
+			playerId = request.playerId,
+			hidingId = request.hidingId,
+		}, now)
+	end
 	for _, hidingId in ipairs(self._hiding:GetSpotIds()) do
 		local spot = self._hiding:GetSpot(hidingId)
 		local result = self._hiding:Tick(hidingId, elapsed, now, self:_movementFactor(hidingId))
@@ -62,6 +68,8 @@ function SilenceMonitor:Tick(elapsed: number, now: number)
 								risk = result.risk,
 								occupancy = self._hiding:GetOccupancy(hidingId),
 								capacity = spot.capacity,
+								heat = self._hiding:GetHeat(hidingId, now),
+								exposed = self._hiding:IsExposed(hidingId, now),
 							},
 						})
 					end

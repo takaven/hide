@@ -48,22 +48,23 @@ These modules avoid Roblox services so Lune can test their rules directly:
 
 ### `src/server/runtime`
 
-- `WorldBuilder` creates the compact fictional Le Morne resort, authored interaction points, patrol network, extraction gate, storm presentation, and original primitive Listener from repository code before world discovery.
+- `WorldBuilder` creates the compact fictional Le Morne resort, enclosed gameplay rooms and corridors, authored interaction/peek/inspection points, patrol network, two extraction routes, storm presentation, and original primitive Listener from repository code before world discovery.
 - `WorldRegistry` reads server-visible CollectionService tags and validates IDs, capacities, and positions.
 - `InteractionBinder` creates native ProximityPrompts for hiding, doors, and extraction. Prompt events re-enter the same validated gateway as explicit remotes.
 - `RemoteGateway` rejects malformed, unknown, replayed, or excessive requests before dispatch.
 - `ActionService` re-checks round/player state, server-derived distance, occupancy, ownership, time, and availability before mutating a domain.
-- `RoundService`, `CaptureService`, `RescueMonitor`, `RescueInteractionService`, and `SilenceMonitor` own time-dependent transitions and contextual presentation.
+- `RoundService`, `CaptureService`, `RescueMonitor`, `RescueInteractionService`, `DownedEvidenceService`, and `SilenceMonitor` own time-dependent transitions and contextual presentation.
 - `PlayerLifecycleService` translates character creation, death/reset, and player removal into one tested cleanup coordinator.
 - `HunterService` feeds visual, noise, and heat evidence into `HunterBrain`, inspects only locally reached exposed-or-hot hiding spots, and requests movement through a navigation provider.
 - `NativeNavigationProvider` uses PathfindingService with cancellation, stuck detection, bounded replanning, and status reporting.
-- `CharacterPresentationService` conceals and immobilises hiding avatars on the server; `DoorPresentationService` makes server leases physically open tagged doors; `ExtractionRuntimeService` ejects hiders when extraction begins.
+- `CharacterPresentationService` conceals and immobilises hiding avatars on the server. `PlayerStatePresentationService` immobilises downed players, shows a bounded rescue marker, and makes eliminated/escaped/spectating characters non-physical and non-queryable. `DoorPresentationService` turns a server lease into a physical brace: the door is held shut while the helper is immobilised and exposed. `ExtractionRuntimeService` ejects hiders when extraction begins.
 - `MovementNoiseService` samples server-observed assembly velocity and floor material. `RobloxAnalyticsProvider` maps the allow-listed analytics bus to server-side `AnalyticsService` custom events without PII fields.
+- `AudioPresentationService` supplies spatial Listener, hiding, door, rescue, decoy, phone, and extraction cues using redistribution-safe Roblox packaged sounds. `MovieMomentDirector` selects at most two bounded authored events per round. `SoakMetricsService` records occupancy, evidence-ledger peak, and event counts for Studio diagnostics.
 - `Remotes` creates a fixed set of remotes with class checks.
 
 ### `src/client`
 
-The client presents contextual actions. Roblox native prompts provide phone, keyboard, and controller affordances for world interactions. ContextActionService supplies large touch actions for exit and the Let Me In accept/refuse decision. After subscribing to events, the client invokes a read-only state snapshot function so a startup race cannot strand it in stale spectator presentation. The client never calculates authoritative success.
+The client presents contextual actions. Roblox native prompts provide phone, keyboard, and controller affordances for world interactions. ContextActionService supplies large touch actions for exit, risky peek, decoy, spectator cycling, and the Let Me In accept/refuse decision. The Shared Silence panel renders immediate noise separately from persistent suspicion/heat. After subscribing to events, the client invokes a read-only state snapshot function so a startup race cannot strand it in stale spectator presentation. The client never calculates authoritative success.
 
 ## Runtime ownership
 
@@ -85,13 +86,13 @@ World construction is intentionally data-driven through tags and attributes:
 
 | Tag | Instance | Required attributes |
 |---|---|---|
-| `HideHidingSpot` | BasePart or Model | `HidingId: string`, `Capacity: integer >= 1`; optional descendant BasePart/Attachment named `HunterApproach` |
+| `HideHidingSpot` | BasePart or Model | `HidingId: string`, `Capacity: integer >= 1`; descendants named `HiddenPoint`, `HunterApproach`, and `PeekPoint` in the current map |
 | `HideDoor` | BasePart or Model | `DoorId: string` |
 | `HideExtraction` | BasePart or Model | `ExtractionId: string` |
 | `HideHunter` | Model | Humanoid and HumanoidRootPart |
 | `HidePatrolPoint` | BasePart or Model | none |
 
-IDs are limited to 64 characters at the network boundary. The current `WorldBuilder` supplies ten hiding spots, three doors, one extraction gate, eight patrol points, and one Listener. All ten hiding spots have authored `HiddenPoint` and `HunterApproach` parts. A later art pass may replace geometry while preserving these tags, attributes, and identifiers.
+IDs are limited to 64 characters at the network boundary. The current `WorldBuilder` supplies six hiding spots with ten total slots, three braceable doors, two alternating extraction routes, eight patrol points, and one Listener. Every hiding spot has authored `HiddenPoint`, `HunterApproach`, and `PeekPoint` parts. The Listener uses a welded non-avatar Humanoid rig with neck-death disabled so long sessions cannot silently remove the threat. A later art pass may replace geometry while preserving these tags, attributes, and identifiers.
 
 `HunterApproach` is the navigation-safe inspection point outside a wardrobe, bed, or cabinet. If absent, the hiding pivot is the fallback. Navigation completion, failure, cancellation, and investigation timeout are distinct brain inputs; failure never masquerades as arrival. Every movement command has a generation, and a new investigation binds the generation created for its own forced `MoveTo`. Only matching-generation arrival/completion can authorize inspection.
 

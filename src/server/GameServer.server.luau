@@ -2,6 +2,8 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local ServerStorage = game:GetService("ServerStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local Config = require(ReplicatedStorage.Hide.Shared.Config)
@@ -12,11 +14,13 @@ local Runtime = ServerScriptService.Hide.runtime
 
 local ActionService = require(Runtime.ActionService)
 local AnalyticsBus = require(Domain.AnalyticsBus)
+local AudioPresentationService = require(Runtime.AudioPresentationService)
 local CaptureService = require(Runtime.CaptureService)
 local CharacterPresentationService = require(Runtime.CharacterPresentationService)
 local DecoySystem = require(Domain.DecoySystem)
 local DoorSystem = require(Domain.DoorSystem)
 local DoorPresentationService = require(Runtime.DoorPresentationService)
+local DownedEvidenceService = require(Runtime.DownedEvidenceService)
 local ExtractionSystem = require(Domain.ExtractionSystem)
 local ExtractionRuntimeService = require(Runtime.ExtractionRuntimeService)
 local HidingSystem = require(Domain.HidingSystem)
@@ -24,9 +28,11 @@ local HunterService = require(Runtime.HunterService)
 local InteractionBinder = require(Runtime.InteractionBinder)
 local NoiseLedger = require(Domain.NoiseLedger)
 local MovementNoiseService = require(Runtime.MovementNoiseService)
+local MovieMomentDirector = require(Runtime.MovieMomentDirector)
 local PlayerStates = require(Domain.PlayerStates)
 local PlayerLifecycle = require(Domain.PlayerLifecycle)
 local PlayerLifecycleService = require(Runtime.PlayerLifecycleService)
+local PlayerStatePresentationService = require(Runtime.PlayerStatePresentationService)
 local RemoteGateway = require(Runtime.RemoteGateway)
 local Remotes = require(Runtime.Remotes)
 local RobloxAnalyticsProvider = require(Runtime.RobloxAnalyticsProvider)
@@ -35,6 +41,7 @@ local RescueMonitor = require(Runtime.RescueMonitor)
 local RescueInteractionService = require(Runtime.RescueInteractionService)
 local RoundService = require(Runtime.RoundService)
 local SilenceMonitor = require(Runtime.SilenceMonitor)
+local SoakMetricsService = require(Runtime.SoakMetricsService)
 local StormPresentationService = require(Runtime.StormPresentationService)
 local StudioTestOverrides = require(Runtime.StudioTestOverrides)
 local WorldRegistry = require(Runtime.WorldRegistry)
@@ -47,6 +54,7 @@ assert(configValid, `invalid HIDE config: {table.concat(configErrors, "; ")}`)
 local worldRoot = WorldBuilder.Build()
 local storm = StormPresentationService.new(worldRoot)
 storm:Start()
+local audio = AudioPresentationService.new(worldRoot)
 
 local remotes = Remotes.create()
 local analytics = AnalyticsBus.new(RobloxAnalyticsProvider.new("mauritius-le-morne-storm-resort"))
@@ -102,6 +110,7 @@ remotes.GetStateSnapshot.OnServerInvoke = function(player: Player)
 		state = state,
 		phase = round:GetState(),
 		deadline = round:GetDeadline(),
+		activeExtractionId = extraction:GetActiveId(),
 	}
 	if state == "Hiding" then
 		local hidingId = hiding:GetPlayerSpot(playerId)
@@ -112,6 +121,7 @@ remotes.GetStateSnapshot.OnServerInvoke = function(player: Player)
 				targetId = hidingId,
 				label = "EXIT",
 			}
+			snapshot.peekAction = { hidingId = hidingId }
 		end
 	end
 	return snapshot
@@ -141,16 +151,45 @@ local actionService = ActionService.new({
 	WorldRegistry = world,
 	Remotes = remotes,
 	Presentation = presentation,
+	Audio = audio,
 })
 local gateway = RemoteGateway.new(Config, remotes, actionService)
 local interactions = InteractionBinder.new(Config, world, gateway)
 local silence = SilenceMonitor.new(hiding, noise, analytics, remotes)
 local movementNoise = MovementNoiseService.new(Config, playerStates, noise, analytics)
+local downedEvidence = DownedEvidenceService.new(Config, playerStates, noise)
+local statePresentation = PlayerStatePresentationService.new(playerStates, worldRoot)
 local doorPresentation =
-	DoorPresentationService.new(world, doors, playerStates, Config.Interaction.MaxDistance)
+	DoorPresentationService.new(world, doors, playerStates, Config.Interaction.MaxDistance, audio)
 local rescueInteractions = RescueInteractionService.new(Config, playerStates, rescue, gateway)
 local hunter =
-	HunterService.new(Config, world, playerStates, hiding, noise, capture, analytics, round)
+	HunterService.new(Config, world, playerStates, hiding, noise, capture, analytics, round, audio)
+local movieMoments = MovieMomentDirector.new({
+	Config = Config,
+	WorldRoot = worldRoot,
+	Noise = noise,
+	Extraction = extraction,
+	Hunter = hunter,
+	Audio = audio,
+	Analytics = analytics,
+	Remotes = remotes,
+})
+local soakMetrics = SoakMetricsService.new(hiding, noise, analytics)
+if RunService:IsStudio() then
+	local momentTestTrigger = Instance.new("BindableFunction")
+	momentTestTrigger.Name = "MovieMomentTestTrigger"
+	momentTestTrigger.OnInvoke = function(kind: string)
+		movieMoments:ResetRound()
+		return movieMoments:Trigger(kind, workspace:GetServerTimeNow())
+	end
+	momentTestTrigger.Parent = ServerStorage
+	local diagnostics = Instance.new("BindableFunction")
+	diagnostics.Name = "HideStudioDiagnostics"
+	diagnostics.OnInvoke = function()
+		return soakMetrics:GetReport()
+	end
+	diagnostics.Parent = ServerStorage
+end
 
 local function registerPlayer(player: Player)
 	local phase = round:GetState()
@@ -161,6 +200,7 @@ local function registerPlayer(player: Player)
 		state = playerStates:Get(tostring(player.UserId)),
 		phase = phase,
 		deadline = round:GetDeadline(),
+		activeExtractionId = extraction:GetActiveId(),
 	})
 end
 
@@ -181,6 +221,10 @@ for _, resetter in ipairs({
 	movementNoise,
 	doorPresentation,
 	rescueInteractions,
+	downedEvidence,
+	statePresentation,
+	movieMoments,
+	soakMetrics,
 }) do
 	round:AddResetter(resetter)
 end
@@ -217,7 +261,11 @@ task.spawn(function()
 		rescueInteractions:Tick()
 		silence:Tick(elapsed, now)
 		movementNoise:Tick(now)
+		downedEvidence:Tick(now)
+		statePresentation:Tick()
 		hunter:Tick(now)
+		movieMoments:Tick(now, round:GetState())
+		soakMetrics:Tick(now)
 		task.wait(0.25)
 	end
 end)

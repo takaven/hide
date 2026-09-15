@@ -28,7 +28,7 @@ function CaptureService:ResetRound()
 	self._lastCapture = {}
 end
 
-function CaptureService:Down(playerId: string, now: number): (boolean, string?)
+function CaptureService:Down(playerId: string, now: number, source: string?): (boolean, string?)
 	local lastCapture = self._lastCapture[playerId]
 	if lastCapture ~= nil and now - lastCapture < self._config.Hunter.CaptureCooldown then
 		return false, "capture is on cooldown"
@@ -56,14 +56,14 @@ function CaptureService:Down(playerId: string, now: number): (boolean, string?)
 		)
 		self._analytics:Emit(
 			"player_eliminated",
-			{ playerId = playerId, reason = "capture_limit" },
+			{ playerId = playerId, reason = "capture_limit", source = source or "unknown" },
 			now
 		)
 	else
 		self._deadlines[playerId] = now + self._config.Rescue.DownedDuration
 		self._analytics:Emit(
 			"player_downed",
-			{ playerId = playerId, captureCount = captureCount },
+			{ playerId = playerId, captureCount = captureCount, source = source or "unknown" },
 			now
 		)
 	end

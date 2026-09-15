@@ -11,16 +11,22 @@ local ALLOWED_EVENTS = {
 	entry_requested = true,
 	entry_accepted = true,
 	entry_refused = true,
+	entry_request_expired = true,
+	hiding_exited = true,
 	silence_warning = true,
 	silence_broken = true,
 	hunter_investigated = true,
 	hunter_found_player = true,
 	heat_based_inspection = true,
+	inspection = true,
+	near_miss = true,
 	player_downed = true,
 	rescue_attempted = true,
 	rescue_completed = true,
 	rescue_cancelled = true,
 	door_held = true,
+	brace_door_used = true,
+	movie_moment = true,
 	player_eliminated = true,
 	decoy_used = true,
 	extraction_started = true,
@@ -46,13 +52,15 @@ function AnalyticsBus:Emit(
 		timestamp = timestamp,
 		schemaVersion = 1,
 	}
+	table.insert(self._buffer, envelope)
+	if #self._buffer > 512 then
+		table.remove(self._buffer, 1)
+	end
 	if self._provider ~= nil then
 		local ok, err = pcall(self._provider.Emit, self._provider, envelope)
 		if not ok then
 			return false, `analytics provider failed: {tostring(err)}`
 		end
-	else
-		table.insert(self._buffer, envelope)
 	end
 	return true, nil
 end

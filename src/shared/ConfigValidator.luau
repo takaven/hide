@@ -55,6 +55,9 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 	positive(errors, "Hiding.DefaultCapacity", field(hiding, "DefaultCapacity"))
 	positive(errors, "Hiding.ExposureDuration", field(hiding, "ExposureDuration"))
 	positive(errors, "Hiding.InspectionHeatThreshold", field(hiding, "InspectionHeatThreshold"))
+	positive(errors, "Hiding.WarmHeatThreshold", field(hiding, "WarmHeatThreshold"))
+	positive(errors, "Hiding.PeekNoise", field(hiding, "PeekNoise"), true)
+	positive(errors, "Hiding.PeekCooldown", field(hiding, "PeekCooldown"))
 
 	for _, key in ipairs({
 		"BaseRisk",
@@ -84,6 +87,14 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 		local inspectionHeat = field(hiding, "InspectionHeatThreshold")
 		if type(inspectionHeat) == "number" and inspectionHeat > 1 then
 			table.insert(errors, "Hiding.InspectionHeatThreshold cannot exceed 1")
+		end
+		local warmHeat = field(hiding, "WarmHeatThreshold")
+		if
+			type(warmHeat) ~= "number"
+			or type(inspectionHeat) ~= "number"
+			or warmHeat >= inspectionHeat
+		then
+			table.insert(errors, "Hiding.WarmHeatThreshold must be below InspectionHeatThreshold")
 		end
 	end
 
@@ -176,6 +187,49 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 	local rescue = field(config, "Rescue")
 	positive(errors, "Rescue.RangeGraceSeconds", field(rescue, "RangeGraceSeconds"), true)
 	positive(errors, "Rescue.CompletionGraceSeconds", field(rescue, "CompletionGraceSeconds"), true)
+	positive(errors, "Rescue.DownedEvidenceInterval", field(rescue, "DownedEvidenceInterval"))
+	positive(
+		errors,
+		"Rescue.DownedEvidenceMagnitude",
+		field(rescue, "DownedEvidenceMagnitude"),
+		true
+	)
+	local extraction = field(config, "Extraction")
+	positive(errors, "Extraction.GateJamDelay", field(extraction, "GateJamDelay"))
+	positive(errors, "Extraction.GateJamDuration", field(extraction, "GateJamDuration"))
+	local hunter = field(config, "Hunter")
+	positive(errors, "Hunter.LastKnownPursuitSeconds", field(hunter, "LastKnownPursuitSeconds"))
+	positive(errors, "Hunter.SearchPointCount", field(hunter, "SearchPointCount"))
+	positive(errors, "Hunter.SearchRadius", field(hunter, "SearchRadius"))
+	local searchPointCount = field(hunter, "SearchPointCount")
+	if
+		type(searchPointCount) ~= "number"
+		or searchPointCount % 1 ~= 0
+		or searchPointCount < 2
+		or searchPointCount > 3
+	then
+		table.insert(errors, "Hunter.SearchPointCount must be an integer from 2 to 3")
+	end
+	local doubleTakeChance = field(hunter, "DoubleTakeChance")
+	if type(doubleTakeChance) ~= "number" or doubleTakeChance < 0 or doubleTakeChance > 1 then
+		table.insert(errors, "Hunter.DoubleTakeChance must be between 0 and 1")
+	end
+	local movieMoments = field(config, "MovieMoments")
+	for _, key in ipairs({
+		"MaxPerRound",
+		"MinimumSpacing",
+		"BlackoutDuration",
+		"BlackoutVisionMultiplier",
+		"BlackoutMovementNoiseMultiplier",
+		"ReceptionPhoneMagnitude",
+		"GeneratorMagnitude",
+	}) do
+		positive(errors, `MovieMoments.{key}`, field(movieMoments, key))
+	end
+	local maxMoments = field(movieMoments, "MaxPerRound")
+	if type(maxMoments) ~= "number" or maxMoments % 1 ~= 0 or maxMoments < 1 or maxMoments > 2 then
+		table.insert(errors, "MovieMoments.MaxPerRound must be 1 or 2")
+	end
 	local security = field(config, "Security")
 	positive(errors, "Security.ReplayWindowSeconds", field(security, "ReplayWindowSeconds"))
 	positive(errors, "Security.MaxRequestIdLength", field(security, "MaxRequestIdLength"))

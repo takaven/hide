@@ -6,6 +6,7 @@ local ActionService = {}
 ActionService.__index = ActionService
 
 function ActionService.new(dependencies: any)
+	dependencies._lastPeek = {}
 	return setmetatable(dependencies, ActionService)
 end
 
@@ -89,6 +90,9 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 				return nil, presentationError or "hiding presentation failed"
 			end
 			self:_noise("HidingEntry", result.noiseMagnitude, spot.position, playerId, spot.id, now)
+			if self.Audio ~= nil then
+				self.Audio:Play("HidingRustle", self.WorldRegistry.Hiding[spot.id].instance)
+			end
 			self.Analytics:Emit("player_hid", { playerId = playerId, hidingId = spot.id }, now)
 			self.Remotes.StateSnapshot:FireClient(player, {
 				state = "Hiding",
@@ -98,6 +102,7 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 					targetId = spot.id,
 					label = "EXIT",
 				},
+				peekAction = { hidingId = spot.id },
 			})
 			if self.Hiding:GetOccupancy(spot.id) > 1 then
 				self.Analytics:Emit("shared_hiding_started", { hidingId = spot.id }, now)
@@ -209,9 +214,14 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 					targetId = spot.id,
 					label = "EXIT",
 				},
+				peekAction = { hidingId = spot.id },
 			})
 		else
-			self.Analytics:Emit("entry_refused", { hidingId = spot.id }, now)
+			self.Analytics:Emit("entry_refused", {
+				hidingId = spot.id,
+				playerId = request.playerId,
+				refusedBy = playerId,
+			}, now)
 			self:_noise("Environment", result.noiseMagnitude, spot.position, playerId, spot.id, now)
 		end
 		for _, occupantId in ipairs(self.Hiding:GetOccupants(spot.id)) do
@@ -230,7 +240,7 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 		if spot == nil then
 			return nil, "unknown hiding spot"
 		end
-		local result, err = self.Hiding:Exit(playerId, payload.hidingId)
+		local result, err = self.Hiding:Exit(playerId, payload.hidingId, now)
 		if result == nil then
 			return nil, err
 		end
@@ -238,9 +248,49 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 			self.Presentation:Reveal(player, payload.hidingId)
 		end
 		self.PlayerStates:Transition(playerId, "Active", "left hiding spot", now)
-		self.Remotes.StateSnapshot:FireClient(player, { state = "Active", clearContext = true })
+		self.Remotes.StateSnapshot:FireClient(player, {
+			state = "Active",
+			clearContext = true,
+			clearPeek = true,
+		})
 		self:_noise("HidingExit", result.noiseMagnitude, spot.position, playerId, spot.id, now)
+		if self.Audio ~= nil then
+			self.Audio:Play("HidingRustle", self.WorldRegistry.Hiding[spot.id].instance)
+		end
+		self.Analytics:Emit("hiding_exited", {
+			playerId = playerId,
+			hidingId = spot.id,
+			duration = result.duration,
+			occupancy = result.occupancyAfter,
+		}, now)
 		return result, nil
+	elseif payload.action == "PeekHiding" then
+		if state ~= "Hiding" or self.Hiding:GetPlayerSpot(playerId) ~= payload.hidingId then
+			return nil, "player is not hiding there"
+		end
+		local record = self.WorldRegistry.Hiding[payload.hidingId]
+		if record == nil or record.peekCFrame == nil then
+			return nil, "hiding view is unavailable"
+		end
+		local lastPeek = self._lastPeek[playerId] or -math.huge
+		if payload.enabled and now - lastPeek < self.Config.Hiding.PeekCooldown then
+			return nil, "peek is cooling down"
+		end
+		if payload.enabled then
+			self._lastPeek[playerId] = now
+			self:_noise(
+				"HidingEntry",
+				self.Config.Hiding.PeekNoise,
+				record.position,
+				playerId,
+				record.id,
+				now
+			)
+		end
+		self.Remotes.StateSnapshot:FireClient(player, {
+			peek = { enabled = payload.enabled, cframe = record.peekCFrame },
+		})
+		return { status = if payload.enabled then "Peeking" else "Hidden" }, nil
 	elseif payload.action == "HoldDoor" or payload.action == "ReleaseDoor" then
 		if state ~= "Active" and state ~= "Rescued" then
 			return nil, "player cannot operate a door from current state"
@@ -257,7 +307,11 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 			local result, err = self.Doors:Hold(playerId, payload.doorId, now)
 			if result then
 				self:_noise("Door", result.noiseMagnitude, door.position, playerId, door.id, now)
-				self.Analytics:Emit("door_held", { playerId = playerId, doorId = door.id }, now)
+				self.Analytics:Emit(
+					"brace_door_used",
+					{ playerId = playerId, doorId = door.id },
+					now
+				)
 				self.Remotes.StateSnapshot:FireClient(player, {
 					contextAction = {
 						action = "ReleaseDoor",
@@ -304,6 +358,9 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 				{ rescuerId = playerId, targetId = payload.targetPlayerId },
 				now
 			)
+			if self.Audio ~= nil then
+				self.Audio:Play("Rescue", target.Character)
+			end
 		end
 		return result, err
 	elseif payload.action == "CompleteRescue" then
@@ -367,6 +424,9 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 			return nil, err
 		end
 		local event = self.Noise:Add(noiseInput, now)
+		if self.Audio ~= nil then
+			self.Audio:Play("DecoyClick", player.Character)
+		end
 		self.Analytics:Emit("decoy_used", { playerId = playerId, decoyId = payload.decoyId }, now)
 		return { status = "Used", evidenceId = event and event.id }, nil
 	elseif payload.action == "Escape" then

@@ -83,8 +83,6 @@ function CharacterPresentationService:Hide(player: Player, hidingId: string): (b
 	if root ~= nil and root:IsA("BasePart") then
 		root.Anchored = true
 	end
-	character:SetAttribute("HideSpotId", hidingId)
-	character:SetAttribute("HideConcealed", true)
 	self._hidden[tostring(player.UserId)] = saved
 	return true, nil
 end
@@ -126,8 +124,6 @@ function CharacterPresentationService:Reveal(player: Player, hidingId: string?):
 	local record = if hidingId then self._world.Hiding[hidingId] else nil
 	local exitPoint = findPoint(record, "HunterApproach")
 	character:PivotTo(if exitPoint then exitPoint.CFrame + Vector3.new(0, 2, 0) else saved.pivot)
-	character:SetAttribute("HideSpotId", nil)
-	character:SetAttribute("HideConcealed", nil)
 	self._hidden[playerId] = nil
 	return true
 end

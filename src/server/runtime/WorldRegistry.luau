@@ -42,6 +42,14 @@ local function resolveApproachPosition(instance: Instance, fallback: Vector3): V
 	return fallback
 end
 
+local function resolvePeekCFrame(instance: Instance): CFrame?
+	local peek = instance:FindFirstChild("PeekPoint", true)
+	if peek ~= nil and peek:IsA("BasePart") then
+		return peek.CFrame
+	end
+	return nil
+end
+
 function WorldRegistry.new()
 	return setmetatable(
 		{ Hiding = {}, Doors = {}, Extractions = {}, Hunters = {}, PatrolPoints = {} },
@@ -77,6 +85,7 @@ function WorldRegistry:Scan(): { string }
 				instance = instance,
 				position = position,
 				approachPosition = resolveApproachPosition(instance, position),
+				peekCFrame = resolvePeekCFrame(instance),
 				capacity = capacity,
 			}
 		end

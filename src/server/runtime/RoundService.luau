@@ -72,17 +72,29 @@ function RoundService:_advance(nextState: string, now: number): boolean
 		end
 		self._analytics:Emit("round_started", { playerCount = #Players:GetPlayers() }, now)
 	elseif nextState == "Extraction" then
+		local activeExtractionId = self._extraction:Open(now)
 		if self._phaseRuntime ~= nil then
 			self._phaseRuntime:BeginExtraction(now)
 		end
-		self._extraction:Open(now)
-		self._analytics:Emit("extraction_started", {}, now)
+		self._analytics:Emit("extraction_started", { extractionId = activeExtractionId }, now)
 	elseif nextState == "Results" then
-		self._analytics:Emit("round_completed", {}, now)
+		local counts = { escaped = 0, eliminated = 0, survivors = 0 }
+		for _, playerId in ipairs(self:_playerIds()) do
+			local playerState = self._playerStates:Get(playerId)
+			if playerState == "Escaped" then
+				counts.escaped += 1
+			elseif playerState == "Eliminated" then
+				counts.eliminated += 1
+			elseif playerState ~= "Spectating" then
+				counts.survivors += 1
+			end
+		end
+		self._analytics:Emit("round_completed", counts, now)
 	end
 	self._remotes.StateSnapshot:FireAllClients({
 		phase = nextState,
 		deadline = self._state:GetDeadline(),
+		activeExtractionId = self._extraction:GetActiveId(),
 	})
 	return true
 end

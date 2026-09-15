@@ -76,7 +76,7 @@ function InteractionBinder:BindAll()
 	end
 	for doorId, record in pairs(self._world.Doors) do
 		local targetId = doorId
-		self:_bind(record.instance, "HoldDoorPrompt", "HOLD DOOR", function(player)
+		self:_bind(record.instance, "HoldDoorPrompt", "BRACE DOOR", function(player)
 			self._gateway:Submit(player, {
 				action = "HoldDoor",
 				requestId = self:_requestId(),

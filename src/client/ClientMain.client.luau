@@ -5,6 +5,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Protocol = require(ReplicatedStorage.Hide.Shared.RemoteProtocol)
+local Config = require(ReplicatedStorage.Hide.Shared.Config)
 local remotesFolder = ReplicatedStorage:WaitForChild("HideRemotes")
 local actionRequest = remotesFolder:WaitForChild(Protocol.RequestEventName) :: RemoteEvent
 local actionResult = remotesFolder:WaitForChild(Protocol.ResultEventName) :: RemoteEvent
@@ -17,6 +18,11 @@ local entryRequestGeneration = 0
 local currentPhase = "Lobby"
 local phaseDeadline = 0
 local currentState = "Spectating"
+local peekEnabled = false
+local peekCFrame: CFrame? = nil
+local spectatorIndex = 0
+local activeExtractionId: string? = nil
+local bindContext: (any) -> ()
 
 local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 local hud = Instance.new("ScreenGui")
@@ -68,14 +74,14 @@ local silencePanel = Instance.new("Frame")
 silencePanel.Name = "SharedSilence"
 silencePanel.AnchorPoint = Vector2.new(0.5, 1)
 silencePanel.Position = UDim2.fromScale(0.5, 0.94)
-silencePanel.Size = UDim2.new(0.76, 0, 0, 58)
+silencePanel.Size = UDim2.new(0.76, 0, 0, 82)
 silencePanel.BackgroundColor3 = Color3.fromRGB(12, 24, 27)
 silencePanel.BackgroundTransparency = 0.08
 silencePanel.Visible = false
 silencePanel.Parent = hud
 local silenceConstraint = Instance.new("UISizeConstraint")
-silenceConstraint.MaxSize = Vector2.new(620, 64)
-silenceConstraint.MinSize = Vector2.new(280, 54)
+silenceConstraint.MaxSize = Vector2.new(620, 90)
+silenceConstraint.MinSize = Vector2.new(280, 76)
 silenceConstraint.Parent = silencePanel
 local silenceCorner = Instance.new("UICorner")
 silenceCorner.CornerRadius = UDim.new(0, 14)
@@ -88,7 +94,7 @@ silenceLabel.Font = Enum.Font.GothamBold
 silenceLabel.TextColor3 = Color3.fromRGB(225, 238, 229)
 silenceLabel.TextSize = 16
 silenceLabel.TextXAlignment = Enum.TextXAlignment.Left
-silenceLabel.Text = "SHARED SILENCE  •  SAFE"
+silenceLabel.Text = "SHARED SILENCE  •  QUIET"
 silenceLabel.Parent = silencePanel
 local meterBack = Instance.new("Frame")
 meterBack.BackgroundColor3 = Color3.fromRGB(51, 63, 63)
@@ -107,6 +113,17 @@ meterFill.Parent = meterBack
 local meterFillCorner = Instance.new("UICorner")
 meterFillCorner.CornerRadius = UDim.new(1, 0)
 meterFillCorner.Parent = meterFill
+local suspicionLabel = Instance.new("TextLabel")
+suspicionLabel.Name = "Suspicion"
+suspicionLabel.BackgroundTransparency = 1
+suspicionLabel.Position = UDim2.fromOffset(14, 51)
+suspicionLabel.Size = UDim2.new(1, -28, 0, 22)
+suspicionLabel.Font = Enum.Font.GothamMedium
+suspicionLabel.TextColor3 = Color3.fromRGB(138, 213, 204)
+suspicionLabel.TextSize = 14
+suspicionLabel.TextXAlignment = Enum.TextXAlignment.Left
+suspicionLabel.Text = "SUSPICION  •  SAFE"
+suspicionLabel.Parent = silencePanel
 
 local toast = Instance.new("TextLabel")
 toast.Name = "Toast"
@@ -162,14 +179,62 @@ local function unbindContext()
 	currentContext = nil
 end
 
-local function clearEntryRequest()
+local function setPeek(enabled: boolean)
+	if currentState ~= "Hiding" or currentContext == nil then
+		return
+	end
+	actionRequest:FireServer({
+		action = "PeekHiding",
+		requestId = nextRequestId(),
+		hidingId = currentContext.targetId,
+		enabled = enabled,
+	})
+end
+
+local function unbindPeek()
+	ContextActionService:UnbindAction("HidePeek")
+	peekEnabled = false
+	peekCFrame = nil
+end
+
+local function bindPeek(hidingId: string)
+	ContextActionService:UnbindAction("HidePeek")
+	ContextActionService:BindAction("HidePeek", function(_, inputState)
+		if inputState == Enum.UserInputState.Begin then
+			setPeek(not peekEnabled)
+			return Enum.ContextActionResult.Sink
+		end
+		return Enum.ContextActionResult.Pass
+	end, true, Enum.KeyCode.V, Enum.KeyCode.ButtonX)
+	ContextActionService:SetTitle("HidePeek", "PEEK")
+	ContextActionService:SetPosition("HidePeek", UDim2.fromScale(0.66, 0.68))
+	styleAction("HidePeek", Color3.fromRGB(47, 103, 128))
+	if currentContext == nil then
+		currentContext = {
+			action = "ExitHiding",
+			targetField = "hidingId",
+			targetId = hidingId,
+			label = "EXIT",
+		}
+	end
+end
+
+local function clearEntryRequest(restoreHidingActions: boolean?)
 	entryRequestGeneration += 1
 	ContextActionService:UnbindAction("HideAcceptEntry")
 	ContextActionService:UnbindAction("HideRefuseEntry")
+	if restoreHidingActions == true and currentState == "Hiding" and currentContext ~= nil then
+		task.defer(function()
+			bindContext(currentContext)
+			bindPeek(currentContext.targetId)
+		end)
+	end
 end
 
 local function bindEntryRequest(entryRequest: any)
-	clearEntryRequest()
+	clearEntryRequest(false)
+	ContextActionService:UnbindAction("HidePrimaryAction")
+	ContextActionService:UnbindAction("HidePeek")
 	local generation = entryRequestGeneration
 	local function respond(accepted: boolean)
 		actionRequest:FireServer({
@@ -178,7 +243,7 @@ local function bindEntryRequest(entryRequest: any)
 			entryRequestId = entryRequest.id,
 			accepted = accepted,
 		})
-		clearEntryRequest()
+		clearEntryRequest(true)
 	end
 	ContextActionService:BindAction("HideAcceptEntry", function(_, inputState)
 		if inputState == Enum.UserInputState.Begin then
@@ -206,12 +271,12 @@ local function bindEntryRequest(entryRequest: any)
 	showToast("LET THEM IN?  MORE PEOPLE MEANS MORE NOISE.", remaining)
 	task.delay(remaining, function()
 		if entryRequestGeneration == generation then
-			clearEntryRequest()
+			clearEntryRequest(true)
 		end
 	end)
 end
 
-local function bindContext(context: any)
+bindContext = function(context: any)
 	unbindContext()
 	if
 		type(context) ~= "table"
@@ -266,16 +331,39 @@ local function updateCamera()
 	if camera == nil then
 		return
 	end
-	if
+	if currentState == "Hiding" and peekEnabled and peekCFrame ~= nil then
+		camera.CameraType = Enum.CameraType.Scriptable
+		camera.CFrame = peekCFrame
+	elseif
 		currentState == "Eliminated"
 		or currentState == "Spectating"
 		or currentState == "Escaped"
 	then
-		local map = workspace:FindFirstChild("LeMorneStormResort")
-		local spectatorCamera = if map then map:FindFirstChild("SpectatorCamera", true) else nil
-		if spectatorCamera ~= nil and spectatorCamera:IsA("BasePart") then
-			camera.CameraType = Enum.CameraType.Scriptable
-			camera.CFrame = spectatorCamera.CFrame
+		local candidates = {}
+		for _, player in ipairs(Players:GetPlayers()) do
+			local character = player.Character
+			local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
+			if
+				player ~= Players.LocalPlayer
+				and character ~= nil
+				and (character:FindFirstChild("Head") == nil or (character.Head :: BasePart).Transparency < 1)
+				and humanoid ~= nil
+				and humanoid.Health > 0
+			then
+				table.insert(candidates, humanoid)
+			end
+		end
+		if #candidates > 0 then
+			spectatorIndex = (spectatorIndex % #candidates) + 1
+			camera.CameraType = Enum.CameraType.Custom
+			camera.CameraSubject = candidates[spectatorIndex]
+		else
+			local map = workspace:FindFirstChild("LeMorneStormResort")
+			local spectatorCamera = if map then map:FindFirstChild("SpectatorCamera", true) else nil
+			if spectatorCamera ~= nil and spectatorCamera:IsA("BasePart") then
+				camera.CameraType = Enum.CameraType.Scriptable
+				camera.CFrame = spectatorCamera.CFrame
+			end
 		end
 	else
 		local character = Players.LocalPlayer.Character
@@ -284,6 +372,26 @@ local function updateCamera()
 			camera.CameraType = Enum.CameraType.Custom
 			camera.CameraSubject = humanoid
 		end
+	end
+end
+
+local function updateSpectatorBinding()
+	ContextActionService:UnbindAction("HideSpectateNext")
+	if
+		currentState == "Eliminated"
+		or currentState == "Spectating"
+		or currentState == "Escaped"
+	then
+		ContextActionService:BindAction("HideSpectateNext", function(_, inputState)
+			if inputState == Enum.UserInputState.Begin then
+				updateCamera()
+				return Enum.ContextActionResult.Sink
+			end
+			return Enum.ContextActionResult.Pass
+		end, true, Enum.KeyCode.C, Enum.KeyCode.ButtonR1)
+		ContextActionService:SetTitle("HideSpectateNext", "NEXT")
+		ContextActionService:SetPosition("HideSpectateNext", UDim2.fromScale(0.82, 0.68))
+		styleAction("HideSpectateNext", Color3.fromRGB(79, 83, 91))
 	end
 end
 
@@ -299,7 +407,13 @@ local objectives = {
 local function updateRoundHud()
 	local remaining = math.max(0, math.ceil(phaseDeadline - workspace:GetServerTimeNow()))
 	phaseLabel.Text = `HIDE!  •  {string.upper(currentPhase)}  {remaining}`
-	objectiveLabel.Text = objectives[currentPhase] or "SURVIVE"
+	if currentPhase == "Extraction" and activeExtractionId ~= nil then
+		objectiveLabel.Text = if activeExtractionId == "service-coast-gate"
+			then "GET OUT NOW — SERVICE COAST EXIT"
+			else "GET OUT NOW — ARRIVAL EVACUATION GATE"
+	else
+		objectiveLabel.Text = objectives[currentPhase] or "SURVIVE"
+	end
 end
 
 task.spawn(function()
@@ -320,6 +434,10 @@ local function applySnapshot(snapshot: any)
 		end
 		updateDecoyBinding()
 	end
+	if type(snapshot) == "table" and type(snapshot.activeExtractionId) == "string" then
+		activeExtractionId = snapshot.activeExtractionId
+		updateRoundHud()
+	end
 	if
 		type(snapshot) == "table"
 		and type(snapshot.state) == "string"
@@ -331,22 +449,40 @@ local function applySnapshot(snapshot: any)
 		currentState = snapshot.state
 		if currentState ~= "Hiding" then
 			silencePanel.Visible = false
+			unbindPeek()
 		end
 		updateDecoyBinding()
 		updateCamera()
+		updateSpectatorBinding()
 	end
 	if type(snapshot) == "table" and type(snapshot.silence) == "table" then
 		local silence = snapshot.silence
 		local risk = math.clamp(tonumber(silence.risk) or 0, 0, 1)
 		silencePanel.Visible = true
 		silenceLabel.Text =
-			`SHARED SILENCE  •  {string.upper(tostring(silence.state))}  •  {silence.occupancy}/{silence.capacity}`
+			`NOISE  •  {string.upper(tostring(silence.state))}  •  {silence.occupancy}/{silence.capacity}`
 		meterFill.Size = UDim2.fromScale(risk, 1)
 		meterFill.BackgroundColor3 = if risk >= 0.85
 			then Color3.fromRGB(224, 53, 47)
 			elseif risk >= 0.58 then Color3.fromRGB(230, 135, 38)
 			elseif risk >= 0.35 then Color3.fromRGB(229, 197, 62)
 			else Color3.fromRGB(68, 196, 135)
+		local heat = math.clamp(tonumber(silence.heat) or 0, 0, 1)
+		local suspicion = if silence.exposed == true
+			then "EXPOSED — IT CAN FIND YOU"
+			elseif heat >= Config.Hiding.InspectionHeatThreshold then "HOT — MOVE SOON"
+			elseif heat >= Config.Hiding.WarmHeatThreshold then "WARM — IT IS LEARNING"
+			else "SAFE"
+		suspicionLabel.Text = `SUSPICION  •  {suspicion}`
+		suspicionLabel.TextColor3 = if silence.exposed == true
+			then Color3.fromRGB(255, 92, 76)
+			elseif heat >= Config.Hiding.InspectionHeatThreshold then Color3.fromRGB(
+				239,
+				147,
+				52
+			)
+			elseif heat >= Config.Hiding.WarmHeatThreshold then Color3.fromRGB(229, 197, 62)
+			else Color3.fromRGB(138, 213, 204)
 	end
 	if type(snapshot) == "table" and snapshot.forceExtraction == true then
 		showToast("THE RESORT IS COMPROMISED — GET OUT NOW", 3.5)
@@ -354,11 +490,26 @@ local function applySnapshot(snapshot: any)
 	if type(snapshot) == "table" and snapshot.entryRequest ~= nil then
 		bindEntryRequest(snapshot.entryRequest)
 	elseif type(snapshot) == "table" and snapshot.clearEntryRequest == true then
-		clearEntryRequest()
+		clearEntryRequest(true)
 	elseif type(snapshot) == "table" and snapshot.contextAction ~= nil then
 		bindContext(snapshot.contextAction)
 	elseif type(snapshot) == "table" and snapshot.clearContext == true then
 		unbindContext()
+	end
+	if type(snapshot) == "table" and snapshot.peekAction ~= nil then
+		bindPeek(snapshot.peekAction.hidingId)
+	elseif type(snapshot) == "table" and snapshot.clearPeek == true then
+		unbindPeek()
+		updateCamera()
+	end
+	if type(snapshot) == "table" and type(snapshot.peek) == "table" then
+		peekEnabled = snapshot.peek.enabled == true
+		peekCFrame = if typeof(snapshot.peek.cframe) == "CFrame" then snapshot.peek.cframe else nil
+		ContextActionService:SetTitle("HidePeek", if peekEnabled then "STOP" else "PEEK")
+		updateCamera()
+	end
+	if type(snapshot) == "table" and type(snapshot.movieMoment) == "table" then
+		showToast(tostring(snapshot.movieMoment.message or "THE STORM SHIFTS"), 3)
 	end
 end
 

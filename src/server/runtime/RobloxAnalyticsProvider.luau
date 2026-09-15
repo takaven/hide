@@ -30,7 +30,13 @@ function RobloxAnalyticsProvider:Emit(envelope: any)
 			table.insert(recipients, player)
 		end
 	else
-		recipients = Players:GetPlayers()
+		local players = Players:GetPlayers()
+		table.sort(players, function(a, b)
+			return a.UserId < b.UserId
+		end)
+		if players[1] ~= nil then
+			table.insert(recipients, players[1])
+		end
 	end
 	local customFields = {
 		[Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = self._mapId,
@@ -43,7 +49,13 @@ function RobloxAnalyticsProvider:Emit(envelope: any)
 			{ "phase", "state", "evidenceKind" }
 		) or "none",
 	}
-	local value = tonumber(properties.duration or properties.risk or properties.playerCount) or 1
+	local value = tonumber(
+		properties.duration
+			or properties.risk
+			or properties.playerCount
+			or properties.escaped
+			or properties.found
+	) or 1
 	for _, player in ipairs(recipients) do
 		AnalyticsService:LogCustomEvent(player, envelope.name, value, customFields)
 	end

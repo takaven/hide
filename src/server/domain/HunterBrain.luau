@@ -70,6 +70,7 @@ function HunterBrain.new(config: any)
 		_ignoredEvidenceId = nil,
 		_ignoredHidingId = nil,
 		_ignoreEvidenceUntil = 0,
+		_lastVisualAt = nil,
 	}, HunterBrain)
 	return self
 end
@@ -90,6 +91,7 @@ function HunterBrain:Reset()
 	self._ignoredEvidenceId = nil
 	self._ignoredHidingId = nil
 	self._ignoreEvidenceUntil = 0
+	self._lastVisualAt = nil
 end
 
 function HunterBrain:BindInvestigationNavigation(generation: number): boolean
@@ -135,6 +137,7 @@ function HunterBrain:Decide(now: number, observation: any): any
 		local ok, err = self:_transition("CHASE", "direct visual contact", now)
 		if ok then
 			self._target = visual.position
+			self._lastVisualAt = now
 			self._searchUntil = nil
 			self._investigationStartedAt = nil
 			self._investigationHidingId = nil
@@ -151,6 +154,16 @@ function HunterBrain:Decide(now: number, observation: any): any
 
 	local current = self:GetState()
 	if current == "CHASE" then
+		if
+			self._lastVisualAt ~= nil
+			and now - self._lastVisualAt < self._config.LastKnownPursuitSeconds
+		then
+			return {
+				state = current,
+				target = self._target,
+				reason = "LastKnownPosition",
+			}
+		end
 		self:_transition("SEARCH", "lost visual contact", now)
 		self._searchUntil = now + self._config.SearchDuration
 		return { state = self:GetState(), target = self._target, reason = "LostVisual" }

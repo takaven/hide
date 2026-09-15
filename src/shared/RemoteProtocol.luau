@@ -17,6 +17,7 @@ RemoteProtocol.Actions = {
 	CompleteRescue = true,
 	UseDecoy = true,
 	Escape = true,
+	PeekHiding = true,
 }
 
 RemoteProtocol.TargetField = {
@@ -29,6 +30,7 @@ RemoteProtocol.TargetField = {
 	CompleteRescue = "rescueId",
 	UseDecoy = "decoyId",
 	Escape = "extractionId",
+	PeekHiding = "hidingId",
 }
 
 return RemoteProtocol

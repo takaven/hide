@@ -36,6 +36,9 @@ return {
 		RefusalNoise = 0.04,
 		ExposureDuration = 10,
 		InspectionHeatThreshold = 0.6,
+		WarmHeatThreshold = 0.35,
+		PeekNoise = 0.1,
+		PeekCooldown = 1.25,
 	},
 
 	Noise = {
@@ -94,6 +97,8 @@ return {
 		CapturesBeforeElimination = 2,
 		RangeGraceSeconds = 1.5,
 		CompletionGraceSeconds = 3,
+		DownedEvidenceInterval = 5,
+		DownedEvidenceMagnitude = 0.16,
 	},
 
 	Decoy = {
@@ -106,6 +111,8 @@ return {
 	Extraction = {
 		OpenDuration = 60,
 		MaxDistance = 12,
+		GateJamDelay = 12,
+		GateJamDuration = 4,
 	},
 
 	Hunter = {
@@ -127,6 +134,20 @@ return {
 		MaxReplans = 4,
 		InvestigationTimeout = 12,
 		InvestigationArrivalDistance = 8,
+		LastKnownPursuitSeconds = 1.25,
+		SearchPointCount = 3,
+		SearchRadius = 14,
+		DoubleTakeChance = 0.18,
+	},
+
+	MovieMoments = {
+		MaxPerRound = 2,
+		MinimumSpacing = 22,
+		BlackoutDuration = 8,
+		BlackoutVisionMultiplier = 0.55,
+		BlackoutMovementNoiseMultiplier = 1.3,
+		ReceptionPhoneMagnitude = 0.62,
+		GeneratorMagnitude = 0.9,
 	},
 
 	Security = {
@@ -143,6 +164,7 @@ return {
 			CompleteRescue = { Limit = 3, WindowSeconds = 5 },
 			UseDecoy = { Limit = 2, WindowSeconds = 10 },
 			Escape = { Limit = 3, WindowSeconds = 5 },
+			PeekHiding = { Limit = 6, WindowSeconds = 5 },
 		},
 	},
 }

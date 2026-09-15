@@ -54,6 +54,11 @@ function MovementNoiseService:Tick(now: number)
 						self._config.MovementNoise.BaseMagnitude
 						+ sprintAlpha * self._config.MovementNoise.SpeedMagnitude
 					) * self:_surfaceMultiplier(humanoid)
+					local worldRoot = workspace:FindFirstChild("LeMorneStormResort")
+					local momentMultiplier = if worldRoot
+						then tonumber(worldRoot:GetAttribute("MovementNoiseMultiplier")) or 1
+						else 1
+					magnitude *= momentMultiplier
 					self._noise:Add({
 						origin = root.Position,
 						magnitude = magnitude,

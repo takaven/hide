@@ -10,7 +10,7 @@ function HunterInspection.Inspect(
 ): { string }
 	local discovered = {}
 	for _, playerId in ipairs(hiding:GetDiscoverableOccupants(hidingId, now)) do
-		local captured = capture:Down(playerId, now)
+		local captured = capture:Down(playerId, now, "spot_inspection")
 		if captured then
 			table.insert(discovered, playerId)
 		end

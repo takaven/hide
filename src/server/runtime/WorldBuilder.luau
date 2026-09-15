@@ -123,6 +123,15 @@ local function addRoom(
 		Enum.Material.Limestone
 	)
 	local height = 12
+	local ceiling = part(
+		room,
+		"Ceiling",
+		Vector3.new(size.X - 1, 0.6, size.Y - 1),
+		center + Vector3.new(0, height + 0.3, 0),
+		Color3.fromRGB(43, 54, 53),
+		Enum.Material.Slate
+	)
+	ceiling.CastShadow = true
 	local gap = 8
 	local horizontalSegment = math.max(2, (size.X - gap) / 2)
 	local horizontalOffset = gap / 2 + horizontalSegment / 2
@@ -230,6 +239,16 @@ local function addHiding(
 	)
 	approach.Transparency = 1
 	approach.CanCollide = false
+	local peek = part(
+		model,
+		"PeekPoint",
+		Vector3.new(1, 1, 1),
+		position + Vector3.new(0, 4.7, 0) + anchor.CFrame.LookVector * 2.2,
+		Color3.new(0, 1, 1)
+	)
+	peek.CFrame = CFrame.lookAt(peek.Position, peek.Position + anchor.CFrame.LookVector * 12)
+	peek.Transparency = 1
+	peek.CanCollide = false
 	CollectionService:AddTag(model, "HideHidingSpot")
 end
 
@@ -321,6 +340,56 @@ local function addPalm(parent: Instance, position: Vector3, height: number)
 	end
 end
 
+local function addFilao(parent: Instance, position: Vector3, height: number)
+	local trunk = part(
+		parent,
+		"FilaoTrunk",
+		Vector3.new(0.7, height, 0.7),
+		position + Vector3.new(0, height / 2, 0),
+		Color3.fromRGB(82, 66, 49),
+		Enum.Material.Wood
+	)
+	trunk.CanCollide = false
+	for index = 1, 7 do
+		local tier = index / 7
+		local crown = part(
+			parent,
+			"FilaoNeedles",
+			Vector3.new(6.5 * (1 - tier * 0.45), 0.35, 6.5 * (1 - tier * 0.45)),
+			position + Vector3.new(0, height * (0.42 + tier * 0.08), 0),
+			Color3.fromRGB(36, 72, 49),
+			Enum.Material.Grass
+		)
+		crown.Shape = Enum.PartType.Cylinder
+		crown.CanCollide = false
+	end
+end
+
+local function addRavenala(parent: Instance, position: Vector3, height: number)
+	part(
+		parent,
+		"RavenalaTrunk",
+		Vector3.new(1, height * 0.55, 1),
+		position + Vector3.new(0, height * 0.275, 0),
+		Color3.fromRGB(105, 83, 54),
+		Enum.Material.Wood
+	).CanCollide =
+		false
+	for index = -3, 3 do
+		local leaf = part(
+			parent,
+			"TravellersPalmLeaf",
+			Vector3.new(2.3, 0.3, 8),
+			position + Vector3.new(0, height * 0.58, 0),
+			Color3.fromRGB(47, 111, 62),
+			Enum.Material.Grass
+		)
+		leaf.CFrame = CFrame.new(position + Vector3.new(0, height * 0.58, 0))
+			* CFrame.Angles(math.rad(-18 - math.abs(index) * 4), math.rad(index * 14), 0)
+		leaf.CanCollide = false
+	end
+end
+
 local function addListener(parent: Instance, position: Vector3)
 	local model = Instance.new("Model")
 	model.Name = "TheListener"
@@ -383,20 +452,24 @@ local function addListener(parent: Instance, position: Vector3)
 	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 	humanoid.HipHeight = 1.5
 	humanoid.WalkSpeed = 14
+	-- The Listener is an original welded rig, not an R6/R15 avatar. Without this,
+	-- Roblox eventually kills the Humanoid because the rig intentionally has no Neck Motor6D.
+	humanoid.RequiresNeck = false
+	humanoid.BreakJointsOnDeath = false
 	humanoid.Parent = model
 	model.PrimaryPart = root
 	CollectionService:AddTag(model, "HideHunter")
 end
 
 local function configureLighting()
-	Lighting.ClockTime = 17.9
-	Lighting.Brightness = 1.7
-	Lighting.Ambient = Color3.fromRGB(58, 72, 76)
-	Lighting.OutdoorAmbient = Color3.fromRGB(68, 82, 86)
+	Lighting.ClockTime = 17.72
+	Lighting.Brightness = 2.05
+	Lighting.Ambient = Color3.fromRGB(70, 82, 86)
+	Lighting.OutdoorAmbient = Color3.fromRGB(80, 92, 96)
 	Lighting.EnvironmentDiffuseScale = 0.35
 	Lighting.EnvironmentSpecularScale = 0.45
 	Lighting.GlobalShadows = true
-	Lighting.ExposureCompensation = -0.08
+	Lighting.ExposureCompensation = 0.08
 	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
 	atmosphere.Name = "CycloneAtmosphere"
 	atmosphere.Color = Color3.fromRGB(134, 158, 166)
@@ -501,6 +574,35 @@ function WorldBuilder.Build(): Model
 		palette.cream,
 		Enum.Material.Limestone
 	)
+	-- Corridor walls turn the central spine into chase geometry instead of an open plaza.
+	for _, spec in ipairs({
+		{ Vector3.new(-13.5, 6, 10), Vector3.new(1, 12, 30) },
+		{ Vector3.new(13.5, 6, 10), Vector3.new(1, 12, 30) },
+		{ Vector3.new(-13.5, 6, -34), Vector3.new(1, 12, 20) },
+		{ Vector3.new(13.5, 6, -34), Vector3.new(1, 12, 20) },
+		{ Vector3.new(-43, 6, 4), Vector3.new(1, 12, 22) },
+		{ Vector3.new(-58, 6, 4), Vector3.new(1, 12, 22) },
+		{ Vector3.new(45, 6, 6), Vector3.new(1, 12, 24) },
+		{ Vector3.new(60, 6, 6), Vector3.new(1, 12, 24) },
+	}) do
+		wall(root, spec[1] :: Vector3, spec[2] :: Vector3)
+	end
+	for _, spec in ipairs({
+		{ "LobbySofa", Vector3.new(12, 3, 4), Vector3.new(10, 1.5, 36) },
+		{ "ReceptionDesk", Vector3.new(14, 4, 2), Vector3.new(-7, 2, 29) },
+		{ "KitchenIsland", Vector3.new(12, 4, 5), Vector3.new(51, 2, -33) },
+		{ "LaundryStack", Vector3.new(8, 6, 4), Vector3.new(-48, 3, -34) },
+		{ "ServiceCrates", Vector3.new(7, 5, 6), Vector3.new(4, 2.5, -35) },
+	}) do
+		part(
+			root,
+			spec[1] :: string,
+			spec[2] :: Vector3,
+			spec[3] :: Vector3,
+			palette.timber,
+			Enum.Material.WoodPlanks
+		)
+	end
 
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "ArrivalSpawn"
@@ -521,18 +623,42 @@ function WorldBuilder.Build(): Model
 	spectatorCamera.Transparency = 1
 	spectatorCamera.CanCollide = false
 	spectatorCamera.CFrame = CFrame.lookAt(spectatorCamera.Position, Vector3.new(0, 3, 0))
+	local spectatorSpawn = part(
+		root,
+		"SpectatorSpawn",
+		Vector3.new(8, 1, 8),
+		Vector3.new(0, 40, 90),
+		Color3.new(1, 1, 1)
+	)
+	spectatorSpawn.Transparency = 1
+	spectatorSpawn.CanCollide = false
+
+	local phone = part(
+		root,
+		"ReceptionPhone",
+		Vector3.new(1.3, 0.5, 1.2),
+		Vector3.new(-7, 4.25, 29),
+		Color3.fromRGB(34, 35, 33),
+		Enum.Material.SmoothPlastic
+	)
+	phone.CanCollide = false
+	local generatorEvent = part(
+		root,
+		"GeneratorEventPoint",
+		Vector3.new(1, 1, 1),
+		Vector3.new(0, 2, -61),
+		Color3.new(1, 1, 1)
+	)
+	generatorEvent.Transparency = 1
+	generatorEvent.CanCollide = false
 
 	local hidingSpecs = {
 		{ "lobby-linen", Vector3.new(-19, 0.5, 32), 2, "LinenCloset", 0 },
-		{ "lounge-cabinet", Vector3.new(62, 0.5, 10), 2, "Cabinet", 90 },
-		{ "suite-wardrobe-a", Vector3.new(-68, 0.5, 10), 2, "Wardrobe", 0 },
-		{ "suite-wardrobe-b", Vector3.new(-42, 0.5, -2), 1, "Wardrobe", 180 },
+		{ "lounge-cabinet", Vector3.new(62, 0.5, 10), 1, "Cabinet", 90 },
+		{ "suite-wardrobe", Vector3.new(-68, 0.5, 10), 2, "Wardrobe", 0 },
 		{ "guest-linen", Vector3.new(-75, 0.5, -7), 3, "LinenCloset", 90 },
-		{ "kitchen-dry-store", Vector3.new(62, 0.5, -40), 2, "DryStore", 180 },
-		{ "kitchen-cold-store", Vector3.new(38, 0.5, -38), 2, "ColdStore", 180 },
-		{ "laundry-cart", Vector3.new(-60, 0.5, -39), 2, "LaundryCabinet", 0 },
-		{ "maintenance-locker", Vector3.new(-34, 0.5, -42), 2, "UtilityLocker", 0 },
-		{ "generator-cabinet", Vector3.new(10, 0.5, -65), 1, "UtilityCabinet", 90 },
+		{ "kitchen-dry-store", Vector3.new(62, 0.5, -40), 1, "DryStore", 180 },
+		{ "maintenance-locker", Vector3.new(-34, 0.5, -42), 1, "UtilityLocker", 0 },
 	}
 	for _, spec in ipairs(hidingSpecs) do
 		addHiding(
@@ -558,8 +684,19 @@ function WorldBuilder.Build(): Model
 		Enum.Material.Metal
 	)
 	extraction:SetAttribute("ExtractionId", "arrival-evacuation-gate")
-	label(extraction, "CYCLONE EVACUATION  •  SORTIE", Enum.NormalId.Front)
+	label(extraction, "CYCLONE EVACUATION  •  SORTIE / EXIT / SORTI", Enum.NormalId.Front)
 	CollectionService:AddTag(extraction, "HideExtraction")
+	local serviceExtraction = part(
+		root,
+		"ServiceCoastGate",
+		Vector3.new(1, 10, 16),
+		Vector3.new(-102, 5, -20),
+		palette.emergency,
+		Enum.Material.Metal
+	)
+	serviceExtraction:SetAttribute("ExtractionId", "service-coast-gate")
+	label(serviceExtraction, "SORTI  •  SERVICE COAST EXIT", Enum.NormalId.Right)
+	CollectionService:AddTag(serviceExtraction, "HideExtraction")
 
 	for index, position in ipairs({
 		Vector3.new(0, 2, 38),
@@ -584,6 +721,48 @@ function WorldBuilder.Build(): Model
 	}) do
 		addPalm(root, position, 16)
 	end
+	for _, position in ipairs({
+		Vector3.new(-95, 0, -92),
+		Vector3.new(-72, 0, -105),
+		Vector3.new(75, 0, -105),
+		Vector3.new(96, 0, -86),
+	}) do
+		addFilao(root, position, 18)
+	end
+	for _, position in ipairs({
+		Vector3.new(-28, 0, 58),
+		Vector3.new(30, 0, 55),
+		Vector3.new(78, 0, 31),
+	}) do
+		addRavenala(root, position, 15)
+	end
+	local chimney = part(
+		root,
+		"SugarMillChimney",
+		Vector3.new(5, 42, 5),
+		Vector3.new(92, 20, -142),
+		Color3.fromRGB(78, 69, 61),
+		Enum.Material.Brick
+	)
+	chimney.CanCollide = false
+	local busShelter = part(
+		root,
+		"MauritianBusShelterRoof",
+		Vector3.new(15, 0.8, 5),
+		Vector3.new(-79, 6, 69),
+		palette.teal,
+		Enum.Material.Metal
+	)
+	busShelter.CanCollide = false
+	local dodoSign = part(
+		root,
+		"DodoMotif",
+		Vector3.new(5, 4, 0.4),
+		Vector3.new(-20, 5, 23.6),
+		palette.teal,
+		Enum.Material.WoodPlanks
+	)
+	label(dodoSign, "DODO  •  RAVINALA NOIR", Enum.NormalId.Back)
 
 	local mountain = Instance.new("Model")
 	mountain.Name = "LeMorneSilhouette"
@@ -601,8 +780,8 @@ function WorldBuilder.Build(): Model
 	local monolith = part(
 		mountain,
 		"LeMorneMonolith",
-		Vector3.new(76, 46, 35),
-		Vector3.new(-8, 48, -175),
+		Vector3.new(68, 50, 35),
+		Vector3.new(-13, 49, -175),
 		Color3.fromRGB(25, 35, 38),
 		Enum.Material.Rock
 	)
@@ -610,12 +789,35 @@ function WorldBuilder.Build(): Model
 	local summit = part(
 		mountain,
 		"LeMorneSummitPlateau",
-		Vector3.new(64, 7, 35),
-		Vector3.new(-11, 72, -175),
+		Vector3.new(50, 6, 35),
+		Vector3.new(-18, 76, -175),
 		Color3.fromRGB(25, 35, 38),
 		Enum.Material.Rock
 	)
 	summit.Orientation = Vector3.new(0, 0, 1)
+	wedge(
+		mountain,
+		"LeMorneFrontRidgeWest",
+		Vector3.new(26, 36, 38),
+		Vector3.new(-38, 37, -157),
+		90
+	)
+	wedge(
+		mountain,
+		"LeMorneFrontRidgeEast",
+		Vector3.new(22, 31, 36),
+		Vector3.new(25, 31, -157),
+		-90
+	)
+	local basaltFace = part(
+		mountain,
+		"LeMorneBasaltFace",
+		Vector3.new(42, 32, 4),
+		Vector3.new(-15, 52, -156),
+		Color3.fromRGB(31, 43, 43),
+		Enum.Material.Rock
+	)
+	basaltFace.Orientation = Vector3.new(0, 0, 3)
 
 	for _, position in ipairs({
 		Vector3.new(0, 10, 37),

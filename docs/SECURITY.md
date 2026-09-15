@@ -35,7 +35,7 @@ Native ProximityPrompt events do not bypass this boundary; `InteractionBinder` s
 | Occupancy race / stale requester | Existence, proximity, state, authorization, and capacity are rechecked before an atomic state/occupancy commit | Roblox server callbacks are serialized between yields; domain mutation functions do not yield |
 | Fake rescue / rescue lockout | Target state, owner, range, time, disconnect, and completion expiry are checked continuously; lifecycle cleanup cancels attempts | Phase 2 must tune grace under real latency |
 | Fake decoy/reward | Server-owned use count; no client reward input | Inventory ownership is intentionally absent in MVP |
-| Spectator grief | Spectator-only states rejected before dispatch; spectator camera is fixed rather than survivor-following | A determined exploiter can inspect replicated world structure, but hidden character parts are server-transparent and non-collidable |
+| Spectator grief / hidden-player leak | Spectator-only states are rejected before dispatch; spectator cycling excludes hidden players; hidden parts are transparent, non-physical, non-touchable, and non-queryable; no hiding ID/concealed attribute is replicated on Player | Roblox cannot make replicated map topology secret; re-test accessories and future VFX whenever character cosmetics are introduced |
 | Hunter oracle or fake exposure | No exposure remote exists; the server creates breach state and permits discovery only on a reached/near completed inspection | Tuning must ensure authored approach points do not create unfair through-wall captures |
 | Respawn ghost state | One lifecycle coordinator clears occupancy, door leases, rescue attempts, capture/context references | Phase 2 must test Roblox respawn settings and latency |
 | Remote replacement | Fixed folder/name/class assertions | Studio must not author conflicting remotes |
@@ -54,7 +54,7 @@ No credentials, personal data, third-party endpoints, persistence, voice, or use
 
 Only placeholder names appear in `.env.example`: `ROBLOX_API_KEY`, `ROBLOX_UNIVERSE_ID`, and `ROBLOX_PLACE_ID`. CI has read-only repository contents permission and no deployment or Roblox secrets. Open Cloud publication remains deferred.
 
-The Rojo place enables `HttpService.HttpEnabled` so the Studio automation plugin can communicate with its loopback bridge during development. No HIDE runtime module issues HTTP requests, and BloxForge was bound to localhost. Reassess and disable the place setting before production publication unless a reviewed runtime HTTP integration is added.
+The production Rojo place does **not** enable `HttpService.HttpEnabled`, and no HIDE runtime module issues HTTP requests. Automated Studio validation uses an ignored, machine-local `.codex-temp` project overlay that enables HTTP only for the loopback BloxForge bridge. That overlay and generated place files are excluded from Git and cannot affect the production build.
 
 ## Runtime security validation priorities
 

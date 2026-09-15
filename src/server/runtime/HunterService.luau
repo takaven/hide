@@ -19,7 +19,8 @@ function HunterService.new(
 	noise: any,
 	capture: any,
 	analytics: any,
-	round: any
+	round: any,
+	audio: any?
 )
 	return setmetatable({
 		_config = config,
@@ -30,6 +31,7 @@ function HunterService.new(
 		_capture = capture,
 		_analytics = analytics,
 		_round = round,
+		_audio = audio,
 		_brain = HunterBrain.new(config.Hunter),
 		_hunter = nil,
 		_navigation = nil,
@@ -40,7 +42,18 @@ function HunterService.new(
 		_lastSeenPlayerId = nil,
 		_lastEvidenceId = nil,
 		_lastRoundPhase = nil,
+		_wasActive = false,
+		_random = Random.new(2405),
+		_patrolOrder = {},
+		_searchCenter = nil,
+		_searchTarget = nil,
+		_searchPointsRemaining = 0,
+		_doubleTakeRequested = false,
 	}, HunterService)
+end
+
+function HunterService:RequestDoubleTake()
+	self._doubleTakeRequested = true
 end
 
 function HunterService:_root(): BasePart?
@@ -60,6 +73,11 @@ function HunterService:_visiblePlayer(root: BasePart): (Player?, Vector3?)
 	raycastParams.FilterType = Enum.RaycastFilterType.Exclude
 	raycastParams.FilterDescendantsInstances = { self._hunter }
 
+	local worldRoot = Workspace:FindFirstChild("LeMorneStormResort")
+	local visionMultiplier = if worldRoot
+		then tonumber(worldRoot:GetAttribute("HunterVisionMultiplier")) or 1
+		else 1
+	local visionDistance = self._config.Hunter.VisionDistance * visionMultiplier
 	for _, player in ipairs(Players:GetPlayers()) do
 		local state = self._playerStates:Get(tostring(player.UserId))
 		if state == "Active" or state == "Rescued" then
@@ -68,7 +86,7 @@ function HunterService:_visiblePlayer(root: BasePart): (Player?, Vector3?)
 			if character ~= nil and position ~= nil then
 				local offset = position - root.Position
 				local distance = offset.Magnitude
-				if distance > 0 and distance <= self._config.Hunter.VisionDistance then
+				if distance > 0 and distance <= visionDistance then
 					local facing = root.CFrame.LookVector:Dot(offset.Unit)
 					if facing >= self._config.Hunter.VisionDotThreshold then
 						local hit = Workspace:Raycast(root.Position, offset, raycastParams)
@@ -87,6 +105,48 @@ function HunterService:_visiblePlayer(root: BasePart): (Player?, Vector3?)
 		end
 	end
 	return nearestPlayer, nearestPosition
+end
+
+function HunterService:_shufflePatrol()
+	self._patrolOrder = table.clone(self._world.PatrolPoints)
+	table.sort(self._patrolOrder, function(a, b)
+		return a.Name < b.Name
+	end)
+	for index = #self._patrolOrder, 2, -1 do
+		local swap = self._random:NextInteger(1, index)
+		self._patrolOrder[index], self._patrolOrder[swap] =
+			self._patrolOrder[swap], self._patrolOrder[index]
+	end
+	self._patrolIndex = 0
+end
+
+function HunterService:_nextSearchPosition(center: Vector3): Vector3
+	if self._searchPointsRemaining == self._config.Hunter.SearchPointCount then
+		return center
+	end
+	if self._searchPointsRemaining == self._config.Hunter.SearchPointCount - 1 then
+		local nearest = nil
+		local nearestDistance = math.huge
+		for _, record in pairs(self._world.Hiding) do
+			local distance = (record.approachPosition - center).Magnitude
+			if
+				distance < nearestDistance
+				and distance <= self._config.Hunter.SearchRadius * 1.5
+			then
+				nearest = record.approachPosition
+				nearestDistance = distance
+			end
+		end
+		if nearest ~= nil then
+			return nearest
+		end
+	end
+	local angle = self._random:NextNumber(0, math.pi * 2)
+	local radius = self._random:NextNumber(
+		self._config.Hunter.SearchRadius * 0.45,
+		self._config.Hunter.SearchRadius
+	)
+	return center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
 end
 
 function HunterService:_noiseEvidence(root: BasePart, now: number): { any }
@@ -124,7 +184,7 @@ function HunterService:_heatEvidence(root: BasePart, now: number): { any }
 end
 
 function HunterService:_nextPatrolPosition(): Vector3?
-	local points = self._world.PatrolPoints
+	local points = self._patrolOrder
 	if #points == 0 then
 		return nil
 	end
@@ -165,9 +225,17 @@ function HunterService:Tick(now: number)
 			self._patrolTarget = nil
 			self._lastEvidenceId = nil
 			self._lastSeenPlayerId = nil
+			self._searchCenter = nil
+			self._searchTarget = nil
+			self._searchPointsRemaining = 0
 		end
+		self._wasActive = false
 		self._lastRoundPhase = phase
 		return
+	end
+	if not self._wasActive then
+		self:_shufflePatrol()
+		self._wasActive = true
 	end
 	self._lastRoundPhase = phase
 
@@ -195,6 +263,15 @@ function HunterService:Tick(now: number)
 		navigationGeneration = navigationGeneration,
 		patrolReturnPosition = self._patrolTarget,
 	})
+	local humanoid = self._hunter and self._hunter:FindFirstChildOfClass("Humanoid")
+	if humanoid ~= nil then
+		humanoid.WalkSpeed = if decision.state == "CHASE"
+			then self._config.Hunter.ChaseSpeed
+			else self._config.Hunter.WalkSpeed
+	end
+	if self._audio ~= nil then
+		self._audio:SetHunterState(decision.state, navigationStatus == "Moving")
+	end
 	if decision.state == "SEARCH" and string.sub(decision.reason, 1, 13) == "Investigation" then
 		if
 			navigationStatus ~= "Idle"
@@ -213,7 +290,7 @@ function HunterService:Tick(now: number)
 		end
 		self._lastSeenPlayerId = playerId
 		if (root.Position - visiblePosition).Magnitude <= self._config.Hunter.CaptureDistance then
-			self._capture:Down(playerId, now)
+			self._capture:Down(playerId, now, "visual_chase")
 		end
 	elseif decision.state == "INVESTIGATE" and decision.evidenceId ~= nil then
 		self._lastSeenPlayerId = nil
@@ -228,11 +305,35 @@ function HunterService:Tick(now: number)
 	else
 		self._lastSeenPlayerId = nil
 	end
+	if decision.state == "SEARCH" and previousBrainState ~= "SEARCH" then
+		if self._navigation:GetStatus() ~= "Idle" then
+			self._navigation:Cancel()
+		end
+		self._searchCenter = decision.target or self._lastTarget or root.Position
+		self._searchPointsRemaining = self._config.Hunter.SearchPointCount
+		self._searchTarget = self:_nextSearchPosition(self._searchCenter)
+		if previousBrainState == "CHASE" then
+			self._analytics:Emit("near_miss", { source = decision.reason }, now)
+		end
+	elseif decision.state ~= "SEARCH" then
+		self._searchCenter = nil
+		self._searchTarget = nil
+		self._searchPointsRemaining = 0
+	end
 	if decision.inspectionReady == true and decision.hidingId ~= nil then
 		local heatDiscoverable = self._hiding:GetHeat(decision.hidingId, now)
 			>= self._config.Hiding.InspectionHeatThreshold
 		local discovered =
 			HunterInspection.Inspect(self._hiding, self._capture, decision.hidingId, now)
+		if self._audio ~= nil then
+			self._audio:Play("ListenerInspect")
+		end
+		self._analytics:Emit("inspection", {
+			hidingId = decision.hidingId,
+			found = #discovered,
+			heat = self._hiding:GetHeat(decision.hidingId, now),
+			exposed = self._hiding:IsExposed(decision.hidingId, now),
+		}, now)
 		if heatDiscoverable and #discovered > 0 then
 			self._analytics:Emit("heat_based_inspection", {
 				hidingId = decision.hidingId,
@@ -249,6 +350,26 @@ function HunterService:Tick(now: number)
 	end
 
 	local target = decision.target
+	if self._doubleTakeRequested and decision.state == "SEARCH" and self._lastTarget ~= nil then
+		self._doubleTakeRequested = false
+		self._searchCenter = self._lastTarget
+		self._searchPointsRemaining = math.min(2, self._config.Hunter.SearchPointCount)
+		self._searchTarget = self._lastTarget
+	end
+	if decision.state == "SEARCH" and self._searchCenter ~= nil then
+		local searchReached = self._searchTarget ~= nil
+			and (root.Position - self._searchTarget).Magnitude
+				<= self._config.Hunter.InvestigationArrivalDistance
+		local searchFinished = navigationStatus == "Completed" or navigationStatus == "Failed"
+		if (searchReached or searchFinished) and self._searchPointsRemaining > 0 then
+			self._searchPointsRemaining -= 1
+			self._searchTarget = if self._searchPointsRemaining > 0
+				then self:_nextSearchPosition(self._searchCenter)
+				else nil
+			self._lastTarget = nil
+		end
+		target = self._searchTarget
+	end
 	if decision.state == "PATROL" and target == nil then
 		if self._patrolTarget == nil or reachedTarget then
 			self._patrolTarget = self:_nextPatrolPosition()
@@ -261,7 +382,7 @@ function HunterService:Tick(now: number)
 			>= self._config.Hunter.MovingTargetRepathDistance
 	local newInvestigation = decision.state == "INVESTIGATE" and previousBrainState ~= "INVESTIGATE"
 	local shouldMove = target ~= nil
-		and decision.state ~= "SEARCH"
+		and self._searchPointsRemaining >= 0
 		and (newInvestigation or self._lastTarget == nil or targetMoved)
 		and (newInvestigation or now - self._lastMoveAt >= self._config.Hunter.RepathInterval)
 	if shouldMove then
