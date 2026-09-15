@@ -21,9 +21,12 @@ local HunterService = require(Runtime.HunterService)
 local InteractionBinder = require(Runtime.InteractionBinder)
 local NoiseLedger = require(Domain.NoiseLedger)
 local PlayerStates = require(Domain.PlayerStates)
+local PlayerLifecycle = require(Domain.PlayerLifecycle)
+local PlayerLifecycleService = require(Runtime.PlayerLifecycleService)
 local RemoteGateway = require(Runtime.RemoteGateway)
 local Remotes = require(Runtime.Remotes)
 local RescueSystem = require(Domain.RescueSystem)
+local RescueMonitor = require(Runtime.RescueMonitor)
 local RoundService = require(Runtime.RoundService)
 local SilenceMonitor = require(Runtime.SilenceMonitor)
 local WorldRegistry = require(Runtime.WorldRegistry)
@@ -46,7 +49,8 @@ for _, issue in ipairs(world:Scan()) do
 	warn(`[HIDE] world binding: {issue}`)
 end
 for hidingId, record in pairs(world.Hiding) do
-	local ok, err = hiding:Register(hidingId, record.capacity, record.position)
+	local ok, err =
+		hiding:Register(hidingId, record.capacity, record.position, record.approachPosition)
 	if not ok then
 		warn(`[HIDE] hiding registration failed: {err}`)
 	end
@@ -64,18 +68,17 @@ for extractionId, record in pairs(world.Extractions) do
 	end
 end
 
-local function registerPlayer(player: Player)
-	playerStates:Add(tostring(player.UserId), false)
-	remotes.StateSnapshot:FireClient(player, { state = "Spectating" })
-end
-
-for _, player in ipairs(Players:GetPlayers()) do
-	registerPlayer(player)
-end
-Players.PlayerAdded:Connect(registerPlayer)
-
 local round = RoundService.new(Config, playerStates, extraction, decoys, analytics, remotes)
 local capture = CaptureService.new(Config, playerStates, hiding, analytics, remotes)
+local lifecycle = PlayerLifecycle.new({
+	PlayerStates = playerStates,
+	Hiding = hiding,
+	Doors = doors,
+	Rescue = rescue,
+	Capture = capture,
+})
+local lifecycleService = PlayerLifecycleService.new(lifecycle, remotes)
+local rescueMonitor = RescueMonitor.new(rescue, playerStates, world)
 local actionService = ActionService.new({
 	Config = Config,
 	Round = round,
@@ -97,6 +100,17 @@ local silence = SilenceMonitor.new(hiding, noise, analytics)
 local hunter =
 	HunterService.new(Config, world, playerStates, hiding, noise, capture, analytics, round)
 
+local function registerPlayer(player: Player)
+	playerStates:Add(tostring(player.UserId), false)
+	lifecycleService:Attach(player)
+	remotes.StateSnapshot:FireClient(player, { state = "Spectating" })
+end
+
+for _, player in ipairs(Players:GetPlayers()) do
+	registerPlayer(player)
+end
+Players.PlayerAdded:Connect(registerPlayer)
+
 for _, resetter in ipairs({ hiding, doors, rescue, extraction, noise, capture, silence }) do
 	round:AddResetter(resetter)
 end
@@ -111,10 +125,7 @@ end
 
 Players.PlayerRemoving:Connect(function(player)
 	local playerId = tostring(player.UserId)
-	local hidingId = hiding:GetPlayerSpot(playerId)
-	if hidingId ~= nil then
-		hiding:Exit(playerId, hidingId)
-	end
+	lifecycleService:Remove(player)
 	analytics:Emit(
 		"player_quit",
 		{ playerId = playerId, phase = round:GetState() },
@@ -131,6 +142,7 @@ task.spawn(function()
 		lastTick = now
 		capture:Tick(now)
 		doors:Tick(now)
+		rescueMonitor:Tick(now)
 		silence:Tick(elapsed, now)
 		hunter:Tick(now)
 		task.wait(0.25)

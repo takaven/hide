@@ -4,7 +4,8 @@ local DoorSystem = {}
 DoorSystem.__index = DoorSystem
 
 function DoorSystem.new(config: any)
-	return setmetatable({ _config = config, _doors = {}, _lastHeld = {} }, DoorSystem)
+	local self: any = setmetatable({ _config = config, _doors = {}, _lastHeld = {} }, DoorSystem)
+	return self
 end
 
 function DoorSystem:ResetRound()
@@ -67,6 +68,18 @@ function DoorSystem:Tick(now: number): { string }
 	local released = {}
 	for doorId, door in pairs(self._doors) do
 		if door.heldBy ~= nil and door.heldUntil <= now then
+			door.heldBy = nil
+			door.heldUntil = nil
+			table.insert(released, doorId)
+		end
+	end
+	return released
+end
+
+function DoorSystem:ReleaseByPlayer(playerId: string, _now: number): { string }
+	local released = {}
+	for doorId, door in pairs(self._doors) do
+		if door.heldBy == playerId then
 			door.heldBy = nil
 			door.heldUntil = nil
 			table.insert(released, doorId)

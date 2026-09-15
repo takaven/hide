@@ -42,7 +42,9 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 	local interaction = field(config, "Interaction")
 	local hiding = field(config, "Hiding")
 	positive(errors, "Interaction.MaxDistance", field(interaction, "MaxDistance"))
+	positive(errors, "Interaction.RequestLifetime", field(interaction, "RequestLifetime"))
 	positive(errors, "Hiding.DefaultCapacity", field(hiding, "DefaultCapacity"))
+	positive(errors, "Hiding.ExposureDuration", field(hiding, "ExposureDuration"))
 
 	for _, key in ipairs({
 		"BaseRisk",
@@ -104,6 +106,8 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 			"MovingTargetRepathDistance",
 			"StuckSeconds",
 			"MaxReplans",
+			"InvestigationTimeout",
+			"InvestigationArrivalDistance",
 		},
 	}
 	for sectionName, fields in pairs(positiveFields) do
@@ -112,6 +116,9 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 			positive(errors, `{sectionName}.{key}`, field(section, key))
 		end
 	end
+	local rescue = field(config, "Rescue")
+	positive(errors, "Rescue.RangeGraceSeconds", field(rescue, "RangeGraceSeconds"), true)
+	positive(errors, "Rescue.CompletionGraceSeconds", field(rescue, "CompletionGraceSeconds"), true)
 	local security = field(config, "Security")
 	positive(errors, "Security.ReplayWindowSeconds", field(security, "ReplayWindowSeconds"))
 	positive(errors, "Security.MaxRequestIdLength", field(security, "MaxRequestIdLength"))

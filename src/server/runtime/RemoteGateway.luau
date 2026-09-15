@@ -1,6 +1,7 @@
 --!strict
 
-local ActionValidator = require(script.Parent.Parent.domain.ActionValidator)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ActionValidator = require(ReplicatedStorage.Hide.Shared.ActionValidator)
 local RateLimiter = require(script.Parent.Parent.domain.RateLimiter)
 local ReplayGuard = require(script.Parent.Parent.domain.ReplayGuard)
 

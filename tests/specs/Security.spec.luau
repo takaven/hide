@@ -1,7 +1,7 @@
 --!strict
 
 local Assert = require("../Assert")
-local ActionValidator = require("../../src/server/domain/ActionValidator")
+local ActionValidator = require("../../src/shared/ActionValidator")
 local Config = require("../../src/shared/Config")
 local RateLimiter = require("../../src/server/domain/RateLimiter")
 local ReplayGuard = require("../../src/server/domain/ReplayGuard")

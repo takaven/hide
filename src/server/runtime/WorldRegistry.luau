@@ -30,6 +30,18 @@ local function readId(instance: Instance, attributeName: string): string?
 	return nil
 end
 
+local function resolveApproachPosition(instance: Instance, fallback: Vector3): Vector3
+	local approach = instance:FindFirstChild("HunterApproach", true)
+	if approach ~= nil then
+		if approach:IsA("BasePart") then
+			return approach.Position
+		elseif approach:IsA("Attachment") then
+			return approach.WorldPosition
+		end
+	end
+	return fallback
+end
+
 function WorldRegistry.new()
 	return setmetatable(
 		{ Hiding = {}, Doors = {}, Extractions = {}, Hunters = {}, PatrolPoints = {} },
@@ -60,8 +72,13 @@ function WorldRegistry:Scan(): { string }
 		elseif self.Hiding[id] ~= nil then
 			table.insert(errors, `duplicate HidingId {id}`)
 		else
-			self.Hiding[id] =
-				{ id = id, instance = instance, position = position, capacity = capacity }
+			self.Hiding[id] = {
+				id = id,
+				instance = instance,
+				position = position,
+				approachPosition = resolveApproachPosition(instance, position),
+				capacity = capacity,
+			}
 		end
 	end
 

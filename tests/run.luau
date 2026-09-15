@@ -9,6 +9,10 @@ local specs = {
 	require("./specs/HunterAndDecoy.spec"),
 	require("./specs/Security.spec"),
 	require("./specs/ConfigAndAnalytics.spec"),
+	require("./specs/HidingExposure.spec"),
+	require("./specs/RescueLifecycle.spec"),
+	require("./specs/HunterInvestigation.spec"),
+	require("./specs/LifecycleAndAtomicity.spec"),
 }
 
 local passed = 0

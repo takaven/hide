@@ -4,7 +4,8 @@ local HidingHeat = {}
 HidingHeat.__index = HidingHeat
 
 function HidingHeat.new(config: any)
-	return setmetatable({ _config = config, _records = {} }, HidingHeat)
+	local self: any = setmetatable({ _config = config, _records = {} }, HidingHeat)
+	return self
 end
 
 function HidingHeat:_valueAt(record: any, now: number): number
@@ -21,7 +22,7 @@ function HidingHeat:Get(hidingId: string, now: number): number
 end
 
 function HidingHeat:RecordUse(hidingId: string, now: number): number
-	local current = self:Get(hidingId, now)
+	local current: number = self:Get(hidingId, now)
 	local value = math.min(self._config.Maximum, current + self._config.UseIncrease)
 	self._records[hidingId] = { value = value, updatedAt = now }
 	return value
@@ -33,7 +34,7 @@ function HidingHeat:TickOccupied(
 	elapsed: number,
 	now: number
 ): number
-	local current = self:Get(hidingId, now - elapsed)
+	local current: number = self:Get(hidingId, now - elapsed)
 	local value = math.min(
 		self._config.Maximum,
 		current

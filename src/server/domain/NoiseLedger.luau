@@ -15,11 +15,12 @@ local function finiteNonNegative(value: any): boolean
 end
 
 function NoiseLedger.new(config: any)
-	return setmetatable({
+	local self: any = setmetatable({
 		_config = config,
 		_events = {},
 		_nextId = 0,
 	}, NoiseLedger)
+	return self
 end
 
 function NoiseLedger:ResetRound()
@@ -87,6 +88,8 @@ function NoiseLedger:GetEvidence(now: number): { any }
 					magnitude = magnitude,
 					category = event.category,
 					timestamp = event.timestamp,
+					sourceId = event.sourceId,
+					sourcePlayerId = event.sourcePlayerId,
 					falseEvidence = event.falseEvidence,
 					score = magnitude * self._config.Categories[event.category],
 				})

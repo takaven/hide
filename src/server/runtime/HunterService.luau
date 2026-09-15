@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 
 local HunterBrain = require(script.Parent.Parent.domain.HunterBrain)
+local HunterInspection = require(script.Parent.Parent.domain.HunterInspection)
 local NativeNavigationProvider = require(script.Parent.NativeNavigationProvider)
 local NavigationProvider = require(script.Parent.NavigationProvider)
 
@@ -91,6 +92,16 @@ end
 function HunterService:_noiseEvidence(root: BasePart, now: number): { any }
 	local evidence = self._noise:GetEvidence(now)
 	for _, item in ipairs(evidence) do
+		local hidingNoise = item.category == "FailedSilence"
+			or item.category == "HidingEntry"
+			or item.category == "HidingExit"
+		local spot = if hidingNoise and item.sourceId
+			then self._hiding:GetSpot(item.sourceId)
+			else nil
+		if spot ~= nil then
+			item.hidingId = spot.id
+			item.origin = spot.approachPosition
+		end
 		item.distance = (root.Position - item.origin).Magnitude
 	end
 	return evidence
@@ -103,9 +114,9 @@ function HunterService:_heatEvidence(root: BasePart, now: number): { any }
 		if spot ~= nil then
 			table.insert(evidence, {
 				hidingId = hidingId,
-				position = spot.position,
+				position = spot.approachPosition,
 				value = self._hiding:GetHeat(hidingId, now),
-				distance = (root.Position - spot.position).Magnitude,
+				distance = (root.Position - spot.approachPosition).Magnitude,
 			})
 		end
 	end
@@ -149,7 +160,7 @@ function HunterService:Tick(now: number)
 			if self._navigation ~= nil and self._navigation:GetStatus() ~= "Idle" then
 				self._navigation:Cancel()
 			end
-			self._brain = HunterBrain.new(self._config.Hunter)
+			self._brain:Reset()
 			self._lastTarget = nil
 			self._patrolTarget = nil
 			self._lastEvidenceId = nil
@@ -166,8 +177,12 @@ function HunterService:Tick(now: number)
 	end
 	local visiblePlayer, visiblePosition = self:_visiblePlayer(root)
 	local previousBrainState = self._brain:GetState()
+	local navigationStatus = self._navigation:GetStatus()
+	local targetDistance = if self._lastTarget ~= nil
+		then (root.Position - self._lastTarget).Magnitude
+		else nil
 	local reachedTarget = self._lastTarget ~= nil
-		and (root.Position - self._lastTarget).Magnitude <= self._config.Hunter.CaptureDistance
+		and targetDistance <= self._config.Hunter.CaptureDistance
 	local decision = self._brain:Decide(now, {
 		visual = if visiblePlayer and visiblePosition
 			then { visible = true, position = visiblePosition }
@@ -175,8 +190,20 @@ function HunterService:Tick(now: number)
 		noises = self:_noiseEvidence(root, now),
 		heatSources = self:_heatEvidence(root, now),
 		reachedTarget = reachedTarget,
+		targetDistance = targetDistance,
+		navigationStatus = navigationStatus,
 		patrolReturnPosition = self._patrolTarget,
 	})
+	if decision.state == "SEARCH" and string.sub(decision.reason, 1, 13) == "Investigation" then
+		if
+			navigationStatus ~= "Idle"
+			and navigationStatus ~= "Completed"
+			and navigationStatus ~= "Failed"
+		then
+			self._navigation:Cancel()
+		end
+		self._lastTarget = nil
+	end
 
 	if visiblePlayer ~= nil and visiblePosition ~= nil then
 		local playerId = tostring(visiblePlayer.UserId)
@@ -200,6 +227,17 @@ function HunterService:Tick(now: number)
 	else
 		self._lastSeenPlayerId = nil
 	end
+	if decision.inspectionReady == true and decision.hidingId ~= nil then
+		local discovered =
+			HunterInspection.Inspect(self._hiding, self._capture, decision.hidingId, now)
+		for _, playerId in ipairs(discovered) do
+			self._analytics:Emit(
+				"hunter_found_player",
+				{ playerId = playerId, hidingId = decision.hidingId, source = "spot_inspection" },
+				now
+			)
+		end
+	end
 
 	local target = decision.target
 	if decision.state == "PATROL" and target == nil then
@@ -208,13 +246,13 @@ function HunterService:Tick(now: number)
 		end
 		target = self._patrolTarget
 	end
-	local navigationStatus = self._navigation:GetStatus()
 	local targetMoved = target ~= nil
 		and self._lastTarget ~= nil
 		and (target - self._lastTarget).Magnitude
 			>= self._config.Hunter.MovingTargetRepathDistance
 	local shouldMove = target ~= nil
-		and (self._lastTarget == nil or targetMoved or navigationStatus == "Failed")
+		and decision.state ~= "SEARCH"
+		and (self._lastTarget == nil or targetMoved)
 		and now - self._lastMoveAt >= self._config.Hunter.RepathInterval
 	if shouldMove then
 		self._navigation:MoveTo(target)

@@ -3,13 +3,9 @@
 local StateMachine = if script
 	then require(script.Parent.StateMachine)
 	else require("./StateMachine")
-local StateDefinitions
-if script then
-	local ReplicatedStorage = game:GetService("ReplicatedStorage")
-	StateDefinitions = require(ReplicatedStorage.Hide.Shared.StateDefinitions)
-else
-	StateDefinitions = require("../../shared/StateDefinitions")
-end
+local StateDefinitions = if script
+	then require(script.Parent.StateDefinitions)
+	else require("./StateDefinitions")
 
 local PlayerStates = {}
 PlayerStates.__index = PlayerStates

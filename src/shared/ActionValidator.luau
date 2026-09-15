@@ -1,12 +1,8 @@
 --!strict
 
-local Protocol
-if script then
-	local ReplicatedStorage = game:GetService("ReplicatedStorage")
-	Protocol = require(ReplicatedStorage.Hide.Shared.RemoteProtocol)
-else
-	Protocol = require("../../shared/RemoteProtocol")
-end
+local Protocol = if script
+	then require(script.Parent.RemoteProtocol)
+	else require("./RemoteProtocol")
 
 local ActionValidator = {}
 
@@ -27,7 +23,6 @@ function ActionValidator.validate(payload: any, securityConfig: any): (boolean, 
 	if not validId(payload.requestId, securityConfig.MaxRequestIdLength) then
 		return false, "invalid request id"
 	end
-
 	local targetField = Protocol.TargetField[payload.action]
 	if not validId(payload[targetField], securityConfig.MaxTargetIdLength) then
 		return false, `invalid {targetField}`
@@ -35,7 +30,6 @@ function ActionValidator.validate(payload: any, securityConfig: any): (boolean, 
 	if payload.action == "ResolveEntryRequest" and type(payload.accepted) ~= "boolean" then
 		return false, "accepted must be a boolean"
 	end
-
 	local allowedKeys = { action = true, requestId = true, [targetField] = true }
 	if payload.action == "ResolveEntryRequest" then
 		allowedKeys.accepted = true
@@ -45,7 +39,6 @@ function ActionValidator.validate(payload: any, securityConfig: any): (boolean, 
 			return false, "payload contains unsupported fields"
 		end
 	end
-
 	return true, nil
 end
 

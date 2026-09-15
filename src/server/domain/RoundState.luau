@@ -3,19 +3,15 @@
 local StateMachine = if script
 	then require(script.Parent.StateMachine)
 	else require("./StateMachine")
-local StateDefinitions
-if script then
-	local ReplicatedStorage = game:GetService("ReplicatedStorage")
-	StateDefinitions = require(ReplicatedStorage.Hide.Shared.StateDefinitions)
-else
-	StateDefinitions = require("../../shared/StateDefinitions")
-end
+local StateDefinitions = if script
+	then require(script.Parent.StateDefinitions)
+	else require("./StateDefinitions")
 
 local RoundState = {}
 RoundState.__index = RoundState
 
 function RoundState.new(config: any, now: number)
-	return setmetatable({
+	local self: any = setmetatable({
 		_config = config,
 		_machine = StateMachine.new(
 			StateDefinitions.Round.Initial,
@@ -24,6 +20,7 @@ function RoundState.new(config: any, now: number)
 		_startedAt = now,
 		_huntCount = 0,
 	}, RoundState)
+	return self
 end
 
 function RoundState:GetState(): string

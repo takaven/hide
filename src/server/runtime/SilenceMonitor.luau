@@ -51,6 +51,7 @@ function SilenceMonitor:Tick(elapsed: number, now: number)
 					now
 				)
 			elseif result.state == "Broken" and previous ~= "Broken" then
+				self._hiding:ApplySilenceState(hidingId, result.state, previous, now)
 				self._noise:Add({
 					origin = spot.position,
 					magnitude = 1,

@@ -4,7 +4,8 @@ local DecoySystem = {}
 DecoySystem.__index = DecoySystem
 
 function DecoySystem.new(config: any)
-	return setmetatable({ _config = config, _usage = {} }, DecoySystem)
+	local self: any = setmetatable({ _config = config, _usage = {} }, DecoySystem)
+	return self
 end
 
 function DecoySystem:ResetRound()

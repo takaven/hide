@@ -31,10 +31,13 @@ jobs:
         run: selene src tests scripts
 
       - name: Generate Rojo sourcemap
-        run: rojo sourcemap default.project.json --output sourcemap.json
+        run: |
+          mkdir -p build
+          rojo sourcemap default.project.json --output sourcemap.json
+          curl -fsSL https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/1.69.0/scripts/globalTypes.d.luau -o build/globalTypes.d.luau
 
-      - name: Static analysis
-        run: luau-lsp analyze --platform=standard src/shared
+      - name: Static analysis of shared and server domain code
+        run: luau-lsp analyze --definitions=build/globalTypes.d.luau --sourcemap=sourcemap.json src/shared src/server/domain
 
       - name: Unit and adversarial tests
         run: lune run tests/run.luau

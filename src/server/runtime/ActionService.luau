@@ -64,17 +64,17 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 		if state ~= "Active" and state ~= "Rescued" then
 			return nil, "player cannot hide from current state"
 		end
-		local result, err = self.Hiding:RequestEntry(playerId, payload.hidingId, now)
+		local result, err = self.Hiding:RequestEntry(playerId, payload.hidingId, now, function()
+			local current = self.PlayerStates:Get(playerId)
+			if current ~= "Active" and current ~= "Rescued" then
+				return false, "player state changed before entry"
+			end
+			return self.PlayerStates:Transition(playerId, "Hiding", "entered hiding spot", now)
+		end)
 		if result == nil then
 			return nil, err
 		end
 		if result.status == "Entered" then
-			local transitioned, transitionError =
-				self.PlayerStates:Transition(playerId, "Hiding", "entered hiding spot", now)
-			if not transitioned then
-				self.Hiding:Exit(playerId, payload.hidingId)
-				return nil, transitionError
-			end
 			self:_noise("HidingEntry", result.noiseMagnitude, spot.position, playerId, spot.id, now)
 			self.Analytics:Emit("player_hid", { playerId = playerId, hidingId = spot.id }, now)
 			self.Remotes.StateSnapshot:FireClient(player, {
@@ -126,25 +126,39 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 		if requester == nil then
 			return nil, "requesting player is unavailable"
 		end
+		local requesterState = self.PlayerStates:Get(request.playerId)
+		if requesterState ~= "Active" and requesterState ~= "Rescued" then
+			return nil, "requesting player can no longer enter"
+		end
 		local requesterNear =
 			self:_isNear(requester, spot.position, self.Config.Interaction.MaxDistance)
 		if not requesterNear then
 			return nil, "requesting player moved too far away"
 		end
-		local result, err =
-			self.Hiding:ResolveEntry(playerId, payload.entryRequestId, payload.accepted, now)
+		local result, err = self.Hiding:ResolveEntry(
+			playerId,
+			payload.entryRequestId,
+			payload.accepted,
+			now,
+			function()
+				local current = self.PlayerStates:Get(request.playerId)
+				if current ~= "Active" and current ~= "Rescued" then
+					return false, "requesting player state changed"
+				end
+				return self.PlayerStates:Transition(
+					request.playerId,
+					"Hiding",
+					"entry accepted",
+					now
+				)
+			end
+		)
 		if result == nil then
 			return nil, err
 		end
 		local eventName = if payload.accepted then "entry_accepted" else "entry_refused"
 		self.Analytics:Emit(eventName, { hidingId = spot.id }, now)
 		if payload.accepted then
-			local transitioned =
-				self.PlayerStates:Transition(request.playerId, "Hiding", "entry accepted", now)
-			if not transitioned then
-				self.Hiding:Exit(request.playerId, spot.id)
-				return nil, "requesting player state changed"
-			end
 			self:_noise(
 				"HidingEntry",
 				result.noiseMagnitude,

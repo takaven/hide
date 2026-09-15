@@ -17,14 +17,16 @@ local function count(dictionary: { [string]: boolean }): number
 end
 
 function HidingSystem.new(config: any)
-	return setmetatable({
+	local self: any = setmetatable({
 		_config = config,
 		_spots = {},
 		_playerSpot = {},
 		_requests = {},
+		_pendingByPlayer = {},
 		_nextRequestId = 0,
 		_heat = HidingHeat.new(config.HidingHeat),
 	}, HidingSystem)
+	return self
 end
 
 function HidingSystem:ResetRound()
@@ -32,9 +34,11 @@ function HidingSystem:ResetRound()
 		spot.occupants = {}
 		spot.recentNoise = 0
 		spot.movementFactor = 0
+		spot.exposedUntil = 0
 	end
 	self._playerSpot = {}
 	self._requests = {}
+	self._pendingByPlayer = {}
 	self._nextRequestId = 0
 	self._heat = HidingHeat.new(self._config.HidingHeat)
 end
@@ -42,7 +46,8 @@ end
 function HidingSystem:Register(
 	hidingId: string,
 	capacity: number?,
-	position: any
+	position: any,
+	approachPosition: any?
 ): (boolean, string?)
 	if type(hidingId) ~= "string" or hidingId == "" then
 		return false, "invalid hiding id"
@@ -54,14 +59,15 @@ function HidingSystem:Register(
 	if type(resolvedCapacity) ~= "number" or resolvedCapacity < 1 or resolvedCapacity % 1 ~= 0 then
 		return false, "capacity must be a positive integer"
 	end
-
 	self._spots[hidingId] = {
 		id = hidingId,
 		capacity = resolvedCapacity,
 		position = position,
+		approachPosition = approachPosition or position,
 		occupants = {},
 		recentNoise = 0,
 		movementFactor = 0,
+		exposedUntil = 0,
 	}
 	return true, nil
 end
@@ -69,11 +75,9 @@ end
 function HidingSystem:GetSpot(hidingId: string): any?
 	return self._spots[hidingId]
 end
-
 function HidingSystem:GetPlayerSpot(playerId: string): string?
 	return self._playerSpot[playerId]
 end
-
 function HidingSystem:GetRequest(requestId: string): any?
 	return self._requests[requestId]
 end
@@ -100,6 +104,7 @@ function HidingSystem:GetOccupants(hidingId: string): { string }
 			table.insert(occupants, playerId)
 		end
 	end
+	table.sort(occupants)
 	return occupants
 end
 
@@ -115,16 +120,29 @@ function HidingSystem:_enter(playerId: string, spot: any, now: number): any
 	}
 end
 
-function HidingSystem:_expireRequests(now: number)
-	for _, request in pairs(self._requests) do
-		if request.status == "Pending" and now > request.expiresAt then
-			request.status = "Expired"
-		end
+function HidingSystem:_removeRequest(request: any)
+	self._requests[request.id] = nil
+	if self._pendingByPlayer[request.playerId] == request.id then
+		self._pendingByPlayer[request.playerId] = nil
 	end
 end
 
-function HidingSystem:RequestEntry(playerId: string, hidingId: string, now: number): (any?, string?)
-	self:_expireRequests(now)
+function HidingSystem:_pendingRequest(playerId: string, now: number): any?
+	local requestId = self._pendingByPlayer[playerId]
+	local request = if requestId then self._requests[requestId] else nil
+	if request ~= nil and now > request.expiresAt then
+		self:_removeRequest(request)
+		return nil
+	end
+	return request
+end
+
+function HidingSystem:RequestEntry(
+	playerId: string,
+	hidingId: string,
+	now: number,
+	onImmediateEnter: (() -> (boolean, string?))?
+): (any?, string?)
 	local spot = self._spots[hidingId]
 	if spot == nil then
 		return nil, "unknown hiding spot"
@@ -137,15 +155,17 @@ function HidingSystem:RequestEntry(playerId: string, hidingId: string, now: numb
 		return nil, "hiding spot is full"
 	end
 	if occupancy == 0 then
+		if onImmediateEnter ~= nil then
+			local eligible, err = onImmediateEnter()
+			if not eligible then
+				return nil, err or "player is no longer eligible to enter"
+			end
+		end
 		return self:_enter(playerId, spot, now), nil
 	end
-
-	for _, request in pairs(self._requests) do
-		if request.playerId == playerId and request.status == "Pending" then
-			return nil, "player already has a pending entry request"
-		end
+	if self:_pendingRequest(playerId, now) ~= nil then
+		return nil, "player already has a pending entry request"
 	end
-
 	self._nextRequestId += 1
 	local request = {
 		id = `entry-{self._nextRequestId}`,
@@ -156,6 +176,7 @@ function HidingSystem:RequestEntry(playerId: string, hidingId: string, now: numb
 		status = "Pending",
 	}
 	self._requests[request.id] = request
+	self._pendingByPlayer[playerId] = request.id
 	return request, nil
 end
 
@@ -163,14 +184,15 @@ function HidingSystem:ResolveEntry(
 	occupantPlayerId: string,
 	requestId: string,
 	accepted: boolean,
-	now: number
+	now: number,
+	eligibilityCommit: (() -> (boolean, string?))?
 ): (any?, string?)
-	self:_expireRequests(now)
 	local request = self._requests[requestId]
 	if request == nil then
 		return nil, "entry request is not pending"
 	end
-	if request.status == "Expired" then
+	if now > request.expiresAt then
+		self:_removeRequest(request)
 		return nil, "entry request expired"
 	end
 	if request.status ~= "Pending" then
@@ -180,10 +202,9 @@ function HidingSystem:ResolveEntry(
 	if spot == nil or spot.occupants[occupantPlayerId] ~= true then
 		return nil, "only a current occupant can resolve this request"
 	end
-
 	if not accepted then
-		request.status = "Refused"
 		spot.recentNoise = math.min(1, spot.recentNoise + self._config.Hiding.RefusalNoise)
+		self:_removeRequest(request)
 		return {
 			status = "Refused",
 			requestId = requestId,
@@ -191,19 +212,23 @@ function HidingSystem:ResolveEntry(
 		},
 			nil
 	end
-
 	if self._playerSpot[request.playerId] ~= nil then
-		request.status = "Cancelled"
+		self:_removeRequest(request)
 		return nil, "requesting player is already hiding"
 	end
 	if count(spot.occupants) >= spot.capacity then
-		request.status = "RejectedFull"
+		self:_removeRequest(request)
 		return nil, "hiding spot became full"
 	end
-
-	request.status = "Accepted"
+	if eligibilityCommit ~= nil then
+		local eligible, err = eligibilityCommit()
+		if not eligible then
+			return nil, err or "requesting player is no longer eligible"
+		end
+	end
 	local result = self:_enter(request.playerId, spot, now)
 	result.requestId = requestId
+	self:_removeRequest(request)
 	return result, nil
 end
 
@@ -219,12 +244,69 @@ function HidingSystem:Exit(playerId: string, hidingId: string): (any?, string?)
 	spot.occupants[playerId] = nil
 	self._playerSpot[playerId] = nil
 	spot.recentNoise = math.min(1, spot.recentNoise + self._config.Hiding.ExitNoise)
-	return {
-		status = "Exited",
-		hidingId = hidingId,
-		noiseMagnitude = self._config.Hiding.ExitNoise,
-	},
+	return { status = "Exited", hidingId = hidingId, noiseMagnitude = self._config.Hiding.ExitNoise },
 		nil
+end
+
+function HidingSystem:RemovePlayer(playerId: string): any
+	local hidingId = self._playerSpot[playerId]
+	if hidingId ~= nil then
+		local spot = self._spots[hidingId]
+		if spot ~= nil then
+			spot.occupants[playerId] = nil
+		end
+		self._playerSpot[playerId] = nil
+	end
+	local requestId = self._pendingByPlayer[playerId]
+	local pending = if requestId then self._requests[requestId] else nil
+	if pending ~= nil then
+		self:_removeRequest(pending)
+	end
+	if hidingId ~= nil and self:GetOccupancy(hidingId) == 0 then
+		local cancelled = {}
+		for _, request in pairs(self._requests) do
+			if request.hidingId == hidingId then
+				table.insert(cancelled, request)
+			end
+		end
+		for _, request in ipairs(cancelled) do
+			self:_removeRequest(request)
+		end
+	end
+	return { hidingId = hidingId }
+end
+
+function HidingSystem:Expose(hidingId: string, now: number): (any?, string?)
+	local spot = self._spots[hidingId]
+	if spot == nil then
+		return nil, "unknown hiding spot"
+	end
+	spot.exposedUntil = math.max(spot.exposedUntil, now + self._config.Hiding.ExposureDuration)
+	return { hidingId = hidingId, exposedUntil = spot.exposedUntil }, nil
+end
+
+function HidingSystem:IsExposed(hidingId: string, now: number): boolean
+	local spot = self._spots[hidingId]
+	return spot ~= nil and now < spot.exposedUntil
+end
+
+function HidingSystem:GetDiscoverableOccupants(hidingId: string, now: number): { string }
+	if not self:IsExposed(hidingId, now) then
+		return {}
+	end
+	return self:GetOccupants(hidingId)
+end
+
+function HidingSystem:ApplySilenceState(
+	hidingId: string,
+	state: string,
+	previousState: string?,
+	now: number
+): any?
+	if state == "Broken" and previousState ~= "Broken" then
+		return self:Expose(hidingId, now)
+	end
+	return nil
 end
 
 function HidingSystem:Tick(

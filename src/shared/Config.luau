@@ -33,6 +33,7 @@ return {
 		EntryNoise = 0.32,
 		ExitNoise = 0.22,
 		RefusalNoise = 0.04,
+		ExposureDuration = 10,
 	},
 
 	Noise = {
@@ -69,6 +70,8 @@ return {
 		MaxDistance = 10,
 		Noise = 0.4,
 		CapturesBeforeElimination = 2,
+		RangeGraceSeconds = 1.5,
+		CompletionGraceSeconds = 3,
 	},
 
 	Decoy = {
@@ -100,6 +103,8 @@ return {
 		MovingTargetRepathDistance = 4,
 		StuckSeconds = 2.5,
 		MaxReplans = 4,
+		InvestigationTimeout = 12,
+		InvestigationArrivalDistance = 8,
 	},
 
 	Security = {
