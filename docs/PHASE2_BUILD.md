@@ -39,11 +39,13 @@ The map targets eight players. Studio uses a one-player minimum solely for local
 The following has been exercised through automated Studio sessions rather than inferred from static source:
 
 - Map boot and registry: ten hiding tags, ten inspection points, three doors, one extraction, one Listener, Mauritius flags, Le Morne silhouette, and visual rain present.
-- Client startup: the initial snapshot handshake restored active presentation even when the server's first event preceded client HUD subscription.
+- Client startup: the initial snapshot handshake restored authoritative presentation even when the server's first event preceded client HUD subscription. Players registering during Lobby/Prepare enter the pending round; late Hunt joins remain spectators.
 - Hiding presentation: server concealment attribute set, root immobilised, parts made transparent/non-queryable, nameplate disabled, Shared Silence HUD displayed, and a conflict-free exit binding restored the full character state.
 - Hold the Door: an actual prompt created the lease, moved the panel by more than four studs, removed collision, and exposed the release action.
 - Extraction/reset: a concealed player was server-revealed and no stale concealment survived the following round.
-- Two-client startup: server and two clients joined the same Studio test and advanced out of Lobby.
+- Two-client startup: server and two clients joined the same Studio test, both entered the pending round from Lobby/Prepare, and both reached Hunt as active players.
+- Let Me In: Player1 requested entry to Player2's occupied hiding place through the production remote gateway; Player2 received both accept/refuse actions, accepted within the request window, and both clients observed `2/2` Shared Silence occupancy before exiting cleanly.
+- Rescue: The Listener downed Player2, the server attached a four-second hold prompt, Player1 started and completed the rescue through the production client/server action pipeline, rescue noise was returned, and Player2 independently observed `Rescued`, normal camera control, restored actions, and no stale prompt. A test-only extended downed window compensated for bridge-call latency; production rescue duration and prompt hold remained unchanged.
 - Mobile: Samsung Galaxy A06 landscape simulation kept the round HUD in bounds and exposed the contextual decoy touch action without covering the default movement stick.
 - Navigation: The Listener moved 25.58 studs during a four-second native-pathing sample on the built map.
 - Performance snapshot: Scene Analysis reported 165 Parts, 7,222 opaque triangles, 15 opaque draw calls, and 821 total runtime instances including Roblox/Core UI content. This is a greybox measurement, not a lower-end device frame-time result.
@@ -55,7 +57,7 @@ Screenshots and raw bridge output are kept outside the public repository because
 ## Remaining validation and risks
 
 - The environment is an intentional gameplay greybox, not production art. Le Morne is a readable stylised silhouette rather than geospatial terrain.
-- Multi-client Let Me In and rescue interactions require a stable long-running Studio multi-client session before release acceptance. A later StudioTestService retry launched a dedicated server but failed to attach its requested clients; this bridge failure was ended cleanly and is not counted as gameplay evidence.
+- Two-client gameplay paths are validated, but an eight-player soak test has not been performed. Early StudioTestService launches were slow to attach the second client; only the later stable two-client sessions are counted as gameplay evidence.
 - Native pathfinding, doors, stairs/corners, chase persistence, and inspection fairness need longer eight-player soak tests on lower-end mobile hardware.
 - MVP sound is limited to Roblox-packaged wind/thunder and default character audio. Bespoke door, hiding, tension, and Listener cues still need an original/licensed upload pipeline before public release.
 - Roblox custom-event dashboard delivery cannot be verified until a staging experience is published.

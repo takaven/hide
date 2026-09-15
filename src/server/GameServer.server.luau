@@ -153,11 +153,13 @@ local hunter =
 	HunterService.new(Config, world, playerStates, hiding, noise, capture, analytics, round)
 
 local function registerPlayer(player: Player)
-	playerStates:Add(tostring(player.UserId), false)
+	local phase = round:GetState()
+	local joinActive = phase == "Lobby" or phase == "Prepare"
+	playerStates:Add(tostring(player.UserId), joinActive)
 	lifecycleService:Attach(player)
 	remotes.StateSnapshot:FireClient(player, {
-		state = "Spectating",
-		phase = round:GetState(),
+		state = playerStates:Get(tostring(player.UserId)),
+		phase = phase,
 		deadline = round:GetDeadline(),
 	})
 end
