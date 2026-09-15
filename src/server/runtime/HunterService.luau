@@ -229,8 +229,16 @@ function HunterService:Tick(now: number)
 		self._lastSeenPlayerId = nil
 	end
 	if decision.inspectionReady == true and decision.hidingId ~= nil then
+		local heatDiscoverable = self._hiding:GetHeat(decision.hidingId, now)
+			>= self._config.Hiding.InspectionHeatThreshold
 		local discovered =
 			HunterInspection.Inspect(self._hiding, self._capture, decision.hidingId, now)
+		if heatDiscoverable and #discovered > 0 then
+			self._analytics:Emit("heat_based_inspection", {
+				hidingId = decision.hidingId,
+				occupantCount = #discovered,
+			}, now)
+		end
 		for _, playerId in ipairs(discovered) do
 			self._analytics:Emit(
 				"hunter_found_player",

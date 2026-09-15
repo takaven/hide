@@ -1,17 +1,18 @@
 --!strict
 
 return {
-	MaxPlayers = 12,
+	MaxPlayers = 8,
 
 	Round = {
 		MinimumPlayers = 2,
+		StudioMinimumPlayers = 1,
 		Durations = {
-			Lobby = 20,
-			Prepare = 15,
-			Hunt = 120,
-			Relocation = 25,
-			Extraction = 60,
-			Results = 15,
+			Lobby = 12,
+			Prepare = 12,
+			Hunt = 75,
+			Relocation = 20,
+			Extraction = 45,
+			Results = 10,
 		},
 	},
 
@@ -52,6 +53,26 @@ return {
 		},
 	},
 
+	MovementNoise = {
+		EmissionInterval = 0.55,
+		MinimumSpeed = 2.5,
+		SpeedForMaximum = 14,
+		BaseMagnitude = 0.12,
+		SpeedMagnitude = 0.28,
+		SurfaceMultipliers = {
+			Default = 1,
+			Carpet = 0.55,
+			Fabric = 0.55,
+			Wood = 0.9,
+			WoodPlanks = 0.9,
+			Slate = 1.05,
+			Limestone = 1.1,
+			Concrete = 1.1,
+			Metal = 1.35,
+			DiamondPlate = 1.45,
+		},
+	},
+
 	HidingHeat = {
 		UseIncrease = 0.24,
 		OccupancyIncreasePerSecond = 0.012,
@@ -60,7 +81,7 @@ return {
 	},
 
 	Door = {
-		HoldDuration = 4,
+		HoldDuration = 8,
 		HoldNoise = 0.28,
 		Cooldown = 2,
 	},

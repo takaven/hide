@@ -9,6 +9,10 @@ end
 
 function PlayerLifecycle:Cleanup(playerId: string, event: string, now: number): any
 	local stateBefore = self.PlayerStates:Get(playerId)
+	local hidingId = self.Hiding:GetPlayerSpot(playerId)
+	if hidingId ~= nil and self.Presentation ~= nil then
+		self.Presentation:RevealById(playerId, hidingId)
+	end
 	local hidingResult = self.Hiding:RemovePlayer(playerId)
 	local releasedDoors = self.Doors:ReleaseByPlayer(playerId, now)
 	local cancelledRescues = self.Rescue:CancelByPlayer(playerId, event, now)

@@ -13,7 +13,8 @@ function RoundService.new(
 	extraction: any,
 	decoys: any,
 	analytics: any,
-	remotes: any
+	remotes: any,
+	phaseRuntime: any?
 )
 	local now = workspace:GetServerTimeNow()
 	return setmetatable({
@@ -23,6 +24,7 @@ function RoundService.new(
 		_extraction = extraction,
 		_analytics = analytics,
 		_remotes = remotes,
+		_phaseRuntime = phaseRuntime,
 		_running = false,
 		_resetters = { decoys },
 	}, RoundService)
@@ -38,6 +40,10 @@ end
 
 function RoundService:GetState(): string
 	return self._state:GetState()
+end
+
+function RoundService:GetDeadline(): number
+	return self._state:GetDeadline()
 end
 
 function RoundService:_playerIds(): { string }
@@ -58,8 +64,17 @@ function RoundService:_advance(nextState: string, now: number): boolean
 			resetter:ResetRound()
 		end
 		self._playerStates:ResetForRound(self:_playerIds(), now)
+		for _, player in ipairs(Players:GetPlayers()) do
+			self._remotes.StateSnapshot:FireClient(
+				player,
+				{ state = self._playerStates:Get(tostring(player.UserId)) }
+			)
+		end
 		self._analytics:Emit("round_started", { playerCount = #Players:GetPlayers() }, now)
 	elseif nextState == "Extraction" then
+		if self._phaseRuntime ~= nil then
+			self._phaseRuntime:BeginExtraction(now)
+		end
 		self._extraction:Open(now)
 		self._analytics:Emit("extraction_started", {}, now)
 	elseif nextState == "Results" then

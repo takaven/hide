@@ -5,6 +5,7 @@ local RemoteProtocol = {}
 RemoteProtocol.RequestEventName = "ActionRequest"
 RemoteProtocol.ResultEventName = "ActionResult"
 RemoteProtocol.SnapshotEventName = "StateSnapshot"
+RemoteProtocol.SnapshotFunctionName = "GetStateSnapshot"
 
 RemoteProtocol.Actions = {
 	RequestHideEntry = true,

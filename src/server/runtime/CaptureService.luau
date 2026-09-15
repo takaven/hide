@@ -8,7 +8,8 @@ function CaptureService.new(
 	playerStates: any,
 	hiding: any,
 	analytics: any,
-	remotes: any
+	remotes: any,
+	presentation: any?
 )
 	return setmetatable({
 		_config = config,
@@ -16,6 +17,7 @@ function CaptureService.new(
 		_hiding = hiding,
 		_analytics = analytics,
 		_remotes = remotes,
+		_presentation = presentation,
 		_deadlines = {},
 		_lastCapture = {},
 	}, CaptureService)
@@ -33,6 +35,9 @@ function CaptureService:Down(playerId: string, now: number): (boolean, string?)
 	end
 	local hidingId = self._hiding:GetPlayerSpot(playerId)
 	if hidingId ~= nil then
+		if self._presentation ~= nil then
+			self._presentation:RevealById(playerId, hidingId)
+		end
 		self._hiding:Exit(playerId, hidingId)
 	end
 	local ok, err =

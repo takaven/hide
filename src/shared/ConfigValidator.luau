@@ -24,15 +24,24 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 	local maxPlayers = field(config, "MaxPlayers")
 	local round = field(config, "Round")
 	local minimumPlayers = field(round, "MinimumPlayers")
+	local studioMinimumPlayers = field(round, "StudioMinimumPlayers")
 	local durations = field(round, "Durations")
 	positive(errors, "MaxPlayers", maxPlayers)
 	positive(errors, "Round.MinimumPlayers", minimumPlayers)
+	positive(errors, "Round.StudioMinimumPlayers", studioMinimumPlayers)
 	if
 		type(minimumPlayers) == "number"
 		and type(maxPlayers) == "number"
 		and minimumPlayers > maxPlayers
 	then
 		table.insert(errors, "Round.MinimumPlayers cannot exceed MaxPlayers")
+	end
+	if
+		type(studioMinimumPlayers) == "number"
+		and type(maxPlayers) == "number"
+		and studioMinimumPlayers > maxPlayers
+	then
+		table.insert(errors, "Round.StudioMinimumPlayers cannot exceed MaxPlayers")
 	end
 
 	for _, phase in ipairs({ "Lobby", "Prepare", "Hunt", "Relocation", "Extraction", "Results" }) do
@@ -88,6 +97,38 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 		for category, weight in pairs(categories) do
 			positive(errors, `Noise.Categories.{category}`, weight, true)
 		end
+	end
+	local movementNoise = field(config, "MovementNoise")
+	for _, key in ipairs({
+		"EmissionInterval",
+		"MinimumSpeed",
+		"SpeedForMaximum",
+		"BaseMagnitude",
+		"SpeedMagnitude",
+	}) do
+		positive(
+			errors,
+			`MovementNoise.{key}`,
+			field(movementNoise, key),
+			key == "BaseMagnitude" or key == "SpeedMagnitude"
+		)
+	end
+	local surfaceMultipliers = field(movementNoise, "SurfaceMultipliers")
+	if type(surfaceMultipliers) ~= "table" or type(surfaceMultipliers.Default) ~= "number" then
+		table.insert(errors, "MovementNoise.SurfaceMultipliers.Default must be configured")
+	else
+		for material, multiplier in pairs(surfaceMultipliers) do
+			positive(errors, `MovementNoise.SurfaceMultipliers.{material}`, multiplier)
+		end
+	end
+	local minimumSpeed = field(movementNoise, "MinimumSpeed")
+	local maximumSpeed = field(movementNoise, "SpeedForMaximum")
+	if
+		type(minimumSpeed) == "number"
+		and type(maximumSpeed) == "number"
+		and maximumSpeed <= minimumSpeed
+	then
+		table.insert(errors, "MovementNoise.SpeedForMaximum must exceed MinimumSpeed")
 	end
 
 	local positiveFields = {

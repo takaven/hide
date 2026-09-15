@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, phase-1/core-foundation]
+    branches: [main, phase-1/core-foundation, phase-2/mauritius-playable]
   pull_request:
     branches: [main]
 

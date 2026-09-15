@@ -53,6 +53,9 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 	end
 
 	if payload.action == "RequestHideEntry" then
+		if self.Doors:GetHeldByPlayer(playerId) ~= nil then
+			return nil, "release the door before hiding"
+		end
 		local spot = self.Hiding:GetSpot(payload.hidingId)
 		if spot == nil then
 			return nil, "unknown hiding spot"
@@ -75,9 +78,20 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 			return nil, err
 		end
 		if result.status == "Entered" then
+			local presented = true
+			local presentationError = nil
+			if self.Presentation ~= nil then
+				presented, presentationError = self.Presentation:Hide(player, spot.id)
+			end
+			if not presented then
+				self.Hiding:Exit(playerId, spot.id)
+				self.PlayerStates:Transition(playerId, "Active", "hiding presentation failed", now)
+				return nil, presentationError or "hiding presentation failed"
+			end
 			self:_noise("HidingEntry", result.noiseMagnitude, spot.position, playerId, spot.id, now)
 			self.Analytics:Emit("player_hid", { playerId = playerId, hidingId = spot.id }, now)
 			self.Remotes.StateSnapshot:FireClient(player, {
+				state = "Hiding",
 				contextAction = {
 					action = "ExitHiding",
 					targetField = "hidingId",
@@ -156,9 +170,23 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 		if result == nil then
 			return nil, err
 		end
-		local eventName = if payload.accepted then "entry_accepted" else "entry_refused"
-		self.Analytics:Emit(eventName, { hidingId = spot.id }, now)
 		if payload.accepted then
+			local presented = true
+			local presentationError = nil
+			if self.Presentation ~= nil then
+				presented, presentationError = self.Presentation:Hide(requester, spot.id)
+			end
+			if not presented then
+				self.Hiding:Exit(request.playerId, spot.id)
+				self.PlayerStates:Transition(
+					request.playerId,
+					"Active",
+					"hiding presentation failed",
+					now
+				)
+				return nil, presentationError or "hiding presentation failed"
+			end
+			self.Analytics:Emit("entry_accepted", { hidingId = spot.id }, now)
 			self:_noise(
 				"HidingEntry",
 				result.noiseMagnitude,
@@ -174,6 +202,7 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 			)
 			self.Analytics:Emit("shared_hiding_started", { hidingId = spot.id }, now)
 			self.Remotes.StateSnapshot:FireClient(requester, {
+				state = "Hiding",
 				contextAction = {
 					action = "ExitHiding",
 					targetField = "hidingId",
@@ -182,6 +211,7 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 				},
 			})
 		else
+			self.Analytics:Emit("entry_refused", { hidingId = spot.id }, now)
 			self:_noise("Environment", result.noiseMagnitude, spot.position, playerId, spot.id, now)
 		end
 		for _, occupantId in ipairs(self.Hiding:GetOccupants(spot.id)) do
@@ -204,8 +234,11 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 		if result == nil then
 			return nil, err
 		end
+		if self.Presentation ~= nil then
+			self.Presentation:Reveal(player, payload.hidingId)
+		end
 		self.PlayerStates:Transition(playerId, "Active", "left hiding spot", now)
-		self.Remotes.StateSnapshot:FireClient(player, { clearContext = true })
+		self.Remotes.StateSnapshot:FireClient(player, { state = "Active", clearContext = true })
 		self:_noise("HidingExit", result.noiseMagnitude, spot.position, playerId, spot.id, now)
 		return result, nil
 	elseif payload.action == "HoldDoor" or payload.action == "ReleaseDoor" then
@@ -224,10 +257,27 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 			local result, err = self.Doors:Hold(playerId, payload.doorId, now)
 			if result then
 				self:_noise("Door", result.noiseMagnitude, door.position, playerId, door.id, now)
+				self.Analytics:Emit("door_held", { playerId = playerId, doorId = door.id }, now)
+				self.Remotes.StateSnapshot:FireClient(player, {
+					contextAction = {
+						action = "ReleaseDoor",
+						targetField = "doorId",
+						targetId = door.id,
+						label = "LET GO",
+					},
+					doorHolding = { doorId = door.id, exposedUntil = result.exposedUntil },
+				})
 			end
 			return result, err
 		end
-		return self.Doors:Release(playerId, payload.doorId, now)
+		local result, err = self.Doors:Release(playerId, payload.doorId, now)
+		if result then
+			self.Remotes.StateSnapshot:FireClient(
+				player,
+				{ clearContext = true, clearDoorHolding = true }
+			)
+		end
+		return result, err
 	elseif payload.action == "StartRescue" then
 		local targetUserId = tonumber(payload.targetPlayerId)
 		local target = if targetUserId then Players:GetPlayerByUserId(targetUserId) else nil
@@ -288,6 +338,10 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 				now
 			)
 			self.Capture:Clear(attempt.targetId)
+			self.Remotes.StateSnapshot:FireAllClients({
+				playerId = attempt.targetId,
+				state = "Rescued",
+			})
 			self:_noise(
 				"Rescue",
 				result.noiseMagnitude,
@@ -329,6 +383,10 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 			self.Extraction:Escape(playerId, payload.extractionId, now, distance, state)
 		if result then
 			self.PlayerStates:Transition(playerId, "Escaped", "extracted", now)
+			self.Remotes.StateSnapshot:FireClient(
+				player,
+				{ state = "Escaped", clearContext = true }
+			)
 			self.Analytics:Emit(
 				"player_escaped",
 				{ playerId = playerId, extractionId = payload.extractionId },

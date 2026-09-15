@@ -5,17 +5,20 @@ local Players = game:GetService("Players")
 local SilenceMonitor = {}
 SilenceMonitor.__index = SilenceMonitor
 
-function SilenceMonitor.new(hiding: any, noise: any, analytics: any)
+function SilenceMonitor.new(hiding: any, noise: any, analytics: any, remotes: any?)
 	return setmetatable({
 		_hiding = hiding,
 		_noise = noise,
 		_analytics = analytics,
 		_lastStates = {},
+		_lastRisk = {},
+		_remotes = remotes,
 	}, SilenceMonitor)
 end
 
 function SilenceMonitor:ResetRound()
 	self._lastStates = {}
+	self._lastRisk = {}
 end
 
 function SilenceMonitor:_movementFactor(hidingId: string): number
@@ -38,7 +41,32 @@ function SilenceMonitor:Tick(elapsed: number, now: number)
 		local result = self._hiding:Tick(hidingId, elapsed, now, self:_movementFactor(hidingId))
 		if spot ~= nil and result ~= nil then
 			local previous = self._lastStates[hidingId]
+			local previousRisk = self._lastRisk[hidingId]
 			self._lastStates[hidingId] = result.state
+			self._lastRisk[hidingId] = result.risk
+			if
+				self._remotes ~= nil
+				and (
+					previous ~= result.state
+					or previousRisk == nil
+					or math.abs(previousRisk - result.risk) >= 0.04
+				)
+			then
+				for _, occupantId in ipairs(self._hiding:GetOccupants(hidingId)) do
+					local userId = tonumber(occupantId)
+					local occupant = if userId then Players:GetPlayerByUserId(userId) else nil
+					if occupant ~= nil then
+						self._remotes.StateSnapshot:FireClient(occupant, {
+							silence = {
+								state = result.state,
+								risk = result.risk,
+								occupancy = self._hiding:GetOccupancy(hidingId),
+								capacity = spot.capacity,
+							},
+						})
+					end
+				end
+			end
 			if
 				(result.state == "Warning" or result.state == "Unstable")
 				and previous ~= "Warning"
