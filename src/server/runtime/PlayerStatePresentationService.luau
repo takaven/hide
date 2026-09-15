@@ -68,6 +68,21 @@ function PlayerStatePresentationService:_capture(playerId: string, character: Mo
 	return saved
 end
 
+local function enforceTerminalCharacter(character: Model)
+	for _, descendant in ipairs(character:GetDescendants()) do
+		if descendant:IsA("BasePart") then
+			descendant.Transparency = 1
+			descendant.CanCollide = false
+			descendant.CanTouch = false
+			descendant.CanQuery = false
+		end
+	end
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if root ~= nil and root:IsA("BasePart") then
+		root.Anchored = true
+	end
+end
+
 function PlayerStatePresentationService:_apply(player: Player, state: string)
 	local playerId = tostring(player.UserId)
 	local character = player.Character
@@ -108,18 +123,10 @@ function PlayerStatePresentationService:_apply(player: Player, state: string)
 			saved.marker = marker
 		end
 	elseif state == "Eliminated" or state == "Escaped" or state == "Spectating" then
-		for _, entry in ipairs(saved.parts) do
-			entry.instance.Transparency = 1
-			entry.instance.CanCollide = false
-			entry.instance.CanTouch = false
-			entry.instance.CanQuery = false
-		end
+		enforceTerminalCharacter(character)
 		if humanoid ~= nil then
 			humanoid.WalkSpeed = 0
 			humanoid.JumpPower = 0
-		end
-		if root ~= nil and root:IsA("BasePart") then
-			root.Anchored = true
 		end
 		local spectatorSpawn = self._worldRoot:FindFirstChild("SpectatorSpawn", true)
 		if spectatorSpawn ~= nil and spectatorSpawn:IsA("BasePart") then
@@ -139,6 +146,14 @@ function PlayerStatePresentationService:Tick()
 			self._characters[playerId] = player.Character
 			self._applied[playerId] = state
 			self:_apply(player, state)
+		end
+		-- Roblox's Humanoid controller may restore torso collision after a state
+		-- transition. Terminal states are an invariant, so enforce them continuously.
+		if
+			player.Character ~= nil
+			and (state == "Eliminated" or state == "Escaped" or state == "Spectating")
+		then
+			enforceTerminalCharacter(player.Character)
 		end
 	end
 end
