@@ -1,0 +1,8 @@
+std = "roblox"
+
+exclude = [
+    "Packages/**",
+    "ServerPackages/**",
+    "DevPackages/**",
+    "build/**",
+]

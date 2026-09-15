@@ -1,0 +1,56 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+secrets.*
+
+# Roblox build output and binary assets
+build/
+dist/
+*.rbxl
+*.rbxlx
+*.rbxm
+*.rbxmx
+*.rbxp
+*.rbxl.lock
+sourcemap.json
+
+# Package and tool output
+Packages/
+ServerPackages/
+DevPackages/
+.rokit/
+.aftman/
+.lune/
+.bloxforge/
+wally.lock
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.code-workspace
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs, coverage, and temporary files
+*.log
+coverage/
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Language tooling
+node_modules/
+target/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
