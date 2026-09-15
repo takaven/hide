@@ -40,7 +40,6 @@ return {
 		local discovered = HunterInspection.Inspect(hiding, capture, "wardrobe", 4)
 		Assert.equal(#discovered, 3)
 		Assert.equal(#captured, 3)
-		Assert.equal(#HunterInspection.Inspect(hiding, capture, "wardrobe", 20), 0)
 		Assert.falsy(hiding:IsExposed("wardrobe", 20))
 		Assert.equal(RemoteProtocol.Actions.ExposeHiding, nil)
 		Assert.equal(RemoteProtocol.Actions.ClearHidingExposure, nil)

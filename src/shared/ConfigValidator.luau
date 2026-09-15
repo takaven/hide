@@ -45,6 +45,7 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 	positive(errors, "Interaction.RequestLifetime", field(interaction, "RequestLifetime"))
 	positive(errors, "Hiding.DefaultCapacity", field(hiding, "DefaultCapacity"))
 	positive(errors, "Hiding.ExposureDuration", field(hiding, "ExposureDuration"))
+	positive(errors, "Hiding.InspectionHeatThreshold", field(hiding, "InspectionHeatThreshold"))
 
 	for _, key in ipairs({
 		"BaseRisk",
@@ -71,6 +72,10 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 		if type(broken) == "number" and broken > 1 then
 			table.insert(errors, "Hiding.BreakThreshold cannot exceed 1")
 		end
+		local inspectionHeat = field(hiding, "InspectionHeatThreshold")
+		if type(inspectionHeat) == "number" and inspectionHeat > 1 then
+			table.insert(errors, "Hiding.InspectionHeatThreshold cannot exceed 1")
+		end
 	end
 
 	local noise = field(config, "Noise")
@@ -86,6 +91,7 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 	end
 
 	local positiveFields = {
+		HidingHeat = { "UseIncrease", "OccupancyIncreasePerSecond", "DecayPerSecond", "Maximum" },
 		Rescue = { "Duration", "DownedDuration", "MaxDistance", "CapturesBeforeElimination" },
 		Door = { "HoldDuration", "Cooldown" },
 		Decoy = { "UsesPerRound", "Cooldown", "Magnitude", "DecaySeconds" },
@@ -115,6 +121,16 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 		for _, key in ipairs(fields) do
 			positive(errors, `{sectionName}.{key}`, field(section, key))
 		end
+	end
+	local hidingHeat = field(config, "HidingHeat")
+	local inspectionHeat = field(hiding, "InspectionHeatThreshold")
+	local maximumHeat = field(hidingHeat, "Maximum")
+	if
+		type(inspectionHeat) == "number"
+		and type(maximumHeat) == "number"
+		and inspectionHeat > maximumHeat
+	then
+		table.insert(errors, "Hiding.InspectionHeatThreshold cannot exceed HidingHeat.Maximum")
 	end
 	local rescue = field(config, "Rescue")
 	positive(errors, "Rescue.RangeGraceSeconds", field(rescue, "RangeGraceSeconds"), true)

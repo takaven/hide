@@ -22,7 +22,9 @@ Each hiding spot combines five server-owned inputs:
 4. server-observed occupant movement;
 5. decaying hiding heat.
 
-The result is clamped to 0–1 and classified as Safe, Warning, Unstable, or Broken. Entering, exiting, refusing entry, moving, and remaining crowded affect risk. A transition into Broken emits a FailedSilence event and compromises that hiding spot for `Hiding.ExposureDuration`. Exposure is server-owned, extends monotonically on a new break, expires automatically, and clears between rounds. Occupants stay in the hiding domain, but The Listener can capture them only after actually reaching or completing a path near that spot's inspection point.
+The result is clamped to 0–1 and classified as Safe, Warning, Unstable, or Broken. Entering, exiting, refusing entry, moving, and remaining crowded affect risk. A transition into Broken emits a FailedSilence event and compromises that hiding spot for `Hiding.ExposureDuration`. Exposure is server-owned, extends monotonically on a new break, expires automatically, and clears between rounds.
+
+Hiding Heat is also a discovery rule, not merely an AI-interest signal. Occupants are discoverable during a successful local inspection when the spot is exposed **or** its heat is at least `Hiding.InspectionHeatThreshold`. The initial value `0.6` is reached after roughly 30 seconds of uninterrupted solo occupancy under the current heat settings. A cold silent spot remains safe from inspection; repeatedly or continuously relying on it eventually does not. Neither path gives The Listener map-wide knowledge: it must physically reach or complete navigation near the spot's inspection point.
 
 ## Let Me In
 
@@ -44,7 +46,7 @@ The Listener is an understandable state machine:
 
 `PATROL -> INVESTIGATE -> SEARCH -> CHASE -> RETURN`
 
-Priority is direct server raycast visibility, then weighted fresh noise, then hiding heat, then patrol. Hiding players are excluded from ordinary direct visual acquisition; a Broken spot makes its occupants discoverable through a local inspection, not map-wide knowledge. Native PathfindingService is wrapped by a replaceable provider with cancellation, bounded replans, and stuck detection. `INVESTIGATE` handles arrived, completed-near, completed-far, failed, cancelled, and timed-out outcomes explicitly, always falling back to `SEARCH` when it cannot inspect.
+Priority is direct server raycast visibility, then weighted fresh noise, then hiding heat, then patrol. Hiding players are excluded from ordinary direct visual acquisition; exposure or threshold heat makes them discoverable only through a local inspection. Native PathfindingService is wrapped by a replaceable provider with cancellation, bounded replans, stuck detection, and monotonically increasing movement generations. `INVESTIGATE` accepts completion/arrival only from the generation bound to its own target, so a previous patrol's `Completed` status cannot produce a false inspection. Arrived, completed-near, completed-far, failed, cancelled, and timed-out outcomes remain explicit.
 
 ## Character lifecycle
 

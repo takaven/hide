@@ -34,6 +34,7 @@ return {
 		ExitNoise = 0.22,
 		RefusalNoise = 0.04,
 		ExposureDuration = 10,
+		InspectionHeatThreshold = 0.6,
 	},
 
 	Noise = {

@@ -291,10 +291,18 @@ function HidingSystem:IsExposed(hidingId: string, now: number): boolean
 end
 
 function HidingSystem:GetDiscoverableOccupants(hidingId: string, now: number): { string }
-	if not self:IsExposed(hidingId, now) then
+	if not self:IsDiscoverable(hidingId, now) then
 		return {}
 	end
 	return self:GetOccupants(hidingId)
+end
+
+function HidingSystem:IsDiscoverable(hidingId: string, now: number): boolean
+	if self._spots[hidingId] == nil then
+		return false
+	end
+	return self:IsExposed(hidingId, now)
+		or self:GetHeat(hidingId, now) >= self._config.Hiding.InspectionHeatThreshold
 end
 
 function HidingSystem:ApplySilenceState(

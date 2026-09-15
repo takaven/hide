@@ -27,8 +27,12 @@ return {
 		})
 		Assert.equal(investigated.state, "INVESTIGATE")
 		Assert.equal(investigated.reason, "Noise")
+		Assert.truthy(brain:BindInvestigationNavigation(1))
 
-		local searching = brain:Decide(1, { noises = {}, heatSources = {}, reachedTarget = true })
+		local searching = brain:Decide(
+			1,
+			{ noises = {}, heatSources = {}, reachedTarget = true, navigationGeneration = 1 }
+		)
 		Assert.equal(searching.state, "SEARCH")
 		local returning =
 			brain:Decide(20, { noises = {}, heatSources = {}, patrolReturnPosition = { x = 0 } })

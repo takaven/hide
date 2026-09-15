@@ -66,6 +66,7 @@ function HunterBrain.new(config: any)
 		_investigationStartedAt = nil,
 		_investigationHidingId = nil,
 		_investigationEvidenceId = nil,
+		_investigationNavigationGeneration = nil,
 		_ignoredEvidenceId = nil,
 		_ignoredHidingId = nil,
 		_ignoreEvidenceUntil = 0,
@@ -85,9 +86,18 @@ function HunterBrain:Reset()
 	self._investigationStartedAt = nil
 	self._investigationHidingId = nil
 	self._investigationEvidenceId = nil
+	self._investigationNavigationGeneration = nil
 	self._ignoredEvidenceId = nil
 	self._ignoredHidingId = nil
 	self._ignoreEvidenceUntil = 0
+end
+
+function HunterBrain:BindInvestigationNavigation(generation: number): boolean
+	if self:GetState() ~= "INVESTIGATE" then
+		return false
+	end
+	self._investigationNavigationGeneration = generation
+	return true
 end
 
 function HunterBrain:_transition(nextState: string, reason: string, now: number): (boolean, string?)
@@ -109,6 +119,7 @@ function HunterBrain:_beginSearch(now: number, reason: string, inspectionReady: 
 	self._investigationStartedAt = nil
 	self._investigationHidingId = nil
 	self._investigationEvidenceId = nil
+	self._investigationNavigationGeneration = nil
 	return {
 		state = self:GetState(),
 		target = self._target,
@@ -128,6 +139,7 @@ function HunterBrain:Decide(now: number, observation: any): any
 			self._investigationStartedAt = nil
 			self._investigationHidingId = nil
 			self._investigationEvidenceId = nil
+			self._investigationNavigationGeneration = nil
 		end
 		return {
 			state = self:GetState(),
@@ -145,8 +157,10 @@ function HunterBrain:Decide(now: number, observation: any): any
 	end
 
 	if current == "INVESTIGATE" then
-		local navigationStatus = observation.navigationStatus
-		if observation.reachedTarget == true then
+		local navigationMatches = self._investigationNavigationGeneration ~= nil
+			and observation.navigationGeneration == self._investigationNavigationGeneration
+		local navigationStatus = if navigationMatches then observation.navigationStatus else "Stale"
+		if navigationMatches and observation.reachedTarget == true then
 			return self:_beginSearch(now, "InvestigationArrived", true)
 		elseif navigationStatus == "Completed" then
 			local near = type(observation.targetDistance) == "number"
@@ -196,6 +210,7 @@ function HunterBrain:Decide(now: number, observation: any): any
 			self._investigationStartedAt = now
 			self._investigationHidingId = evidence.hidingId
 			self._investigationEvidenceId = evidence.evidenceId
+			self._investigationNavigationGeneration = nil
 		end
 		return {
 			state = self:GetState(),

@@ -11,6 +11,10 @@ function NavigationProvider.validate(provider: any): (boolean, string?)
 			return false, `navigation provider is missing {method}`
 		end
 	end
+	local ok, status, generation = pcall(provider.GetStatus, provider)
+	if not ok or type(status) ~= "string" or type(generation) ~= "number" then
+		return false, "navigation provider status must include a numeric movement generation"
+	end
 	return true, nil
 end
 

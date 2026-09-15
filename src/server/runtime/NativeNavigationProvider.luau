@@ -11,16 +11,26 @@ function NativeNavigationProvider.new(agentModel: Model, config: any)
 		_config = config,
 		_generation = 0,
 		_status = "Idle",
+		_statusGeneration = 0,
 	}, NativeNavigationProvider)
 end
 
-function NativeNavigationProvider:GetStatus(): string
-	return self._status
+function NativeNavigationProvider:GetStatus(): (string, number)
+	return self._status, self._statusGeneration
+end
+
+function NativeNavigationProvider:_setStatus(generation: number, status: string): boolean
+	if generation ~= self._generation then
+		return false
+	end
+	self._status = status
+	self._statusGeneration = generation
+	return true
 end
 
 function NativeNavigationProvider:Cancel()
 	self._generation += 1
-	self._status = "Cancelled"
+	self:_setStatus(self._generation, "Cancelled")
 	local humanoid = self._agent:FindFirstChildOfClass("Humanoid")
 	local root = self._agent:FindFirstChild("HumanoidRootPart")
 	if humanoid and root and root:IsA("BasePart") then
@@ -29,15 +39,16 @@ function NativeNavigationProvider:Cancel()
 end
 
 function NativeNavigationProvider:MoveTo(goal: Vector3): (boolean, string?)
+	self._generation += 1
+	local generation = self._generation
 	local humanoid = self._agent:FindFirstChildOfClass("Humanoid")
 	local root = self._agent:FindFirstChild("HumanoidRootPart")
 	if humanoid == nil or root == nil or not root:IsA("BasePart") then
+		self:_setStatus(generation, "Failed")
 		return false, "hunter requires Humanoid and HumanoidRootPart"
 	end
 
-	self._generation += 1
-	local generation = self._generation
-	self._status = "Planning"
+	self:_setStatus(generation, "Planning")
 
 	task.spawn(function()
 		local replans = 0
@@ -46,14 +57,17 @@ function NativeNavigationProvider:MoveTo(goal: Vector3): (boolean, string?)
 			local computed = pcall(function()
 				path:ComputeAsync(root.Position, goal)
 			end)
+			if generation ~= self._generation then
+				return
+			end
 			if not computed or path.Status ~= Enum.PathStatus.Success then
 				replans += 1
-				self._status = "Replanning"
+				self:_setStatus(generation, "Replanning")
 				task.wait(self._config.RepathInterval)
 				continue
 			end
 
-			self._status = "Moving"
+			self:_setStatus(generation, "Moving")
 			local shouldReplan = false
 			local blockedConnection = path.Blocked:Connect(function()
 				shouldReplan = true
@@ -93,15 +107,15 @@ function NativeNavigationProvider:MoveTo(goal: Vector3): (boolean, string?)
 			if generation ~= self._generation then
 				return
 			elseif not shouldReplan then
-				self._status = "Completed"
+				self:_setStatus(generation, "Completed")
 				return
 			end
 			replans += 1
-			self._status = "Replanning"
+			self:_setStatus(generation, "Replanning")
 			task.wait(self._config.RepathInterval)
 		end
 		if generation == self._generation then
-			self._status = "Failed"
+			self:_setStatus(generation, "Failed")
 		end
 	end)
 

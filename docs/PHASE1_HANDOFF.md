@@ -6,6 +6,7 @@
 - Branch: `phase-1/core-foundation`
 - Pull request: `#1`
 - Claude-reviewed baseline: `2e7c4df2bc2bb8333836a0a94a36292eccdb52e1`
+- Final-remediation baseline: `3b7441668bc1496b488bd34290b513e5b085cb10`
 - Scope: review the remediation delta only. Phase 2 remains closed; do not merge or enter Roblox Studio.
 
 ## Claude gate provenance
@@ -20,11 +21,13 @@ Claude returned **PASS WITH REMEDIATION** and identified three blockers plus thr
 | M1: Let Me In mutation order | Requester existence, proximity, and state are checked before the state-transition/occupancy commit. No rollback noise, heat, occupancy, or accepted analytics remain. |
 | M4: character lifecycle | A tested coordinator cleans hiding, doors, rescue, capture, contextual state, and legal player-state recovery on recreation, death/reset, and removal. |
 | M6: narrow static analysis | CI now analyses all shared and server-domain Luau using the Rojo sourcemap and pinned Roblox definitions. |
+| Final B1: quiet solo camping remained undiscoverable | Local inspection now reveals occupants when a spot is exposed or heat reaches `Hiding.InspectionHeatThreshold`; cold spots remain protected. |
+| Navigation follow-up: stale Completed status | Movement generations bind each investigation to its forced `MoveTo`; only a matching generation can authorize arrival/completion inspection. |
 
 ## Implemented foundation
 
 - Configurable round and player transition graphs.
-- Shared Silence risk, occupancy, movement input, local noise, hiding heat, timed compromise, and local hunter inspection.
+- Shared Silence risk, occupancy, movement input, local noise, hiding heat, timed compromise, heat-threshold discovery, and local hunter inspection.
 - Let Me In request, accept/refuse, expiry/pruning, authorization, atomic admission, and capacity checks.
 - Timed Hold the Door lease with lifecycle release.
 - Validated decaying evidence ledger with decoys on the same evidence scoring path.
@@ -57,14 +60,16 @@ Runtime adapters are not yet included in luau-lsp analysis because their injecte
 ## Delta-review attack list
 
 1. Keep one player still in a quiet spot, then add second/third occupants and verify risk rises.
-2. Break a spot, wait for The Listener to reach its `HunterApproach`, and verify occupants are discoverable only within the compromise window.
-3. Attempt to invent exposure/immunity through remote payloads; no such client action exists.
-4. Walk away, disconnect, become downed/eliminated, recover the target, and exceed rescue timing; verify ownership cancels and another rescuer can take over.
-5. Return Failed, Cancelled, Completed-near, Completed-far, and no result from navigation; verify INVESTIGATE cannot persist beyond timeout.
-6. Down the requester while Let Me In is pending; acceptance must not change occupancy, heat, noise, or analytics.
-7. Recreate/remove a character while hiding, holding a door, rescuing, or downed; verify no ghost interaction state survives.
-8. Introduce an obvious type error under `src/server/domain`; CI static analysis must fail.
-9. Reset a round with compromise, rescue, and investigation active; each domain must return to its clean initial state.
+2. Inspect a cold silent solo spot and verify no discovery; keep it occupied until heat crosses `0.6`, inspect locally, and verify discovery without a Broken state.
+3. Break a separate spot, wait for The Listener to reach its `HunterApproach`, and verify exposure-based discovery still works.
+4. Attempt to invent heat, discoverability, exposure immunity, or safety through remote payloads; no such client action exists.
+5. Feed a previous patrol generation's `Completed` status into a new investigation and verify it remains in INVESTIGATE until its own generation completes.
+6. Walk away, disconnect, become downed/eliminated, recover the target, and exceed rescue timing; verify ownership cancels and another rescuer can take over.
+7. Return Failed, Cancelled, Completed-near, Completed-far, and no result from navigation; verify INVESTIGATE cannot persist beyond timeout.
+8. Down the requester while Let Me In is pending; acceptance must not change occupancy, heat, noise, or analytics.
+9. Recreate/remove a character while hiding, holding a door, rescuing, or downed; verify no ghost interaction state survives.
+10. Introduce an obvious type error under `src/server/domain`; CI static analysis must fail.
+11. Reset a round with hot/compromised spots, rescue, and investigation active; each domain must return to its clean initial state.
 
 ## Required early Phase-2 work
 

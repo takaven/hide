@@ -17,6 +17,14 @@ return {
 		invalidExposure.Hiding = table.clone(Config.Hiding)
 		invalidExposure.Hiding.ExposureDuration = 0
 		Assert.falsy(ConfigValidator.validate(invalidExposure))
+		local invalidColdThreshold = table.clone(Config)
+		invalidColdThreshold.Hiding = table.clone(Config.Hiding)
+		invalidColdThreshold.Hiding.InspectionHeatThreshold = 0
+		Assert.falsy(ConfigValidator.validate(invalidColdThreshold))
+		local invalidHotThreshold = table.clone(Config)
+		invalidHotThreshold.Hiding = table.clone(Config.Hiding)
+		invalidHotThreshold.Hiding.InspectionHeatThreshold = 1.01
+		Assert.falsy(ConfigValidator.validate(invalidHotThreshold))
 		local invalidInvestigation = table.clone(Config)
 		invalidInvestigation.Hunter = table.clone(Config.Hunter)
 		invalidInvestigation.Hunter.InvestigationTimeout = 0

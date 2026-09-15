@@ -177,7 +177,7 @@ function HunterService:Tick(now: number)
 	end
 	local visiblePlayer, visiblePosition = self:_visiblePlayer(root)
 	local previousBrainState = self._brain:GetState()
-	local navigationStatus = self._navigation:GetStatus()
+	local navigationStatus, navigationGeneration = self._navigation:GetStatus()
 	local targetDistance = if self._lastTarget ~= nil
 		then (root.Position - self._lastTarget).Magnitude
 		else nil
@@ -192,6 +192,7 @@ function HunterService:Tick(now: number)
 		reachedTarget = reachedTarget,
 		targetDistance = targetDistance,
 		navigationStatus = navigationStatus,
+		navigationGeneration = navigationGeneration,
 		patrolReturnPosition = self._patrolTarget,
 	})
 	if decision.state == "SEARCH" and string.sub(decision.reason, 1, 13) == "Investigation" then
@@ -250,12 +251,17 @@ function HunterService:Tick(now: number)
 		and self._lastTarget ~= nil
 		and (target - self._lastTarget).Magnitude
 			>= self._config.Hunter.MovingTargetRepathDistance
+	local newInvestigation = decision.state == "INVESTIGATE" and previousBrainState ~= "INVESTIGATE"
 	local shouldMove = target ~= nil
 		and decision.state ~= "SEARCH"
-		and (self._lastTarget == nil or targetMoved)
-		and now - self._lastMoveAt >= self._config.Hunter.RepathInterval
+		and (newInvestigation or self._lastTarget == nil or targetMoved)
+		and (newInvestigation or now - self._lastMoveAt >= self._config.Hunter.RepathInterval)
 	if shouldMove then
 		self._navigation:MoveTo(target)
+		if newInvestigation then
+			local _, investigationGeneration = self._navigation:GetStatus()
+			self._brain:BindInvestigationNavigation(investigationGeneration)
+		end
 		self._lastTarget = target
 		self._lastMoveAt = now
 	end

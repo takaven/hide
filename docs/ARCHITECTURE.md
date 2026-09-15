@@ -37,7 +37,7 @@ These modules avoid Roblox services so Lune can test their rules directly:
 - state machines for rounds, players, and The Listener;
 - authoritative character lifecycle cleanup across hiding, doors, rescue, and capture;
 - Shared Silence risk calculation;
-- hiding occupancy, Let Me In requests, acceptance/refusal, and heat;
+- hiding occupancy, Let Me In requests, acceptance/refusal, heat, and exposure-or-heat inspection eligibility;
 - noise creation, validation, decay, and evidence projection;
 - Hold the Door leases;
 - rescue attempts, ownership, cancellation, range grace, and completion expiry;
@@ -54,7 +54,7 @@ These modules avoid Roblox services so Lune can test their rules directly:
 - `ActionService` re-checks round/player state, server-derived distance, occupancy, ownership, time, and availability before mutating a domain.
 - `RoundService`, `CaptureService`, `RescueMonitor`, and `SilenceMonitor` own time-dependent transitions.
 - `PlayerLifecycleService` translates character creation, death/reset, and player removal into one tested cleanup coordinator.
-- `HunterService` feeds visual, noise, and heat evidence into `HunterBrain`, inspects only reached compromised hiding spots, and requests movement through a navigation provider.
+- `HunterService` feeds visual, noise, and heat evidence into `HunterBrain`, inspects only locally reached exposed-or-hot hiding spots, and requests movement through a navigation provider.
 - `NativeNavigationProvider` uses PathfindingService with cancellation, stuck detection, bounded replanning, and status reporting.
 - `Remotes` creates a fixed set of remotes with class checks.
 
@@ -90,7 +90,9 @@ World construction is intentionally data-driven through tags and attributes:
 
 IDs are limited to 64 characters at the network boundary. Phase 2 must ensure uniqueness and create a Mauritius-inspired fictional resort greybox without embedding game logic in the place.
 
-`HunterApproach` is the navigation-safe inspection point outside a wardrobe, bed, or cabinet. If absent, the hiding pivot is the fallback. Navigation completion, failure, cancellation, and investigation timeout are distinct brain inputs; failure never masquerades as arrival.
+`HunterApproach` is the navigation-safe inspection point outside a wardrobe, bed, or cabinet. If absent, the hiding pivot is the fallback. Navigation completion, failure, cancellation, and investigation timeout are distinct brain inputs; failure never masquerades as arrival. Every movement command has a generation, and a new investigation binds the generation created for its own forced `MoveTo`. Only matching-generation arrival/completion can authorize inspection.
+
+`HidingSystem:IsDiscoverable` is the single inspection gate: current timed exposure or heat at/above `Hiding.InspectionHeatThreshold`. The heat ledger and this decision live in server-domain code under `ServerScriptService`; no network action can set heat, discovery, exposure immunity, or safety.
 
 ## Static-analysis boundary
 
