@@ -72,6 +72,8 @@ The client presents contextual actions. Roblox native prompts provide phone, key
 
 `staging.project.json` is the reproducible publication input for the private test experience. It carries only non-secret environment attributes and maps the same repository-owned client, server, and shared source as the default project; the generated `.rbxlx` remains ignored.
 
+Both Rojo projects explicitly use Roblox's modern `Soft` lighting style. This records the Compatibility-to-Voxel migration selected by Studio and prevents the lighting result from existing only as unpublished place metadata.
+
 `HighlightTracker` observes the provider-neutral analytics bus. It derives a bounded moment-of-the-round and positive Results awards from events the server already accepted; it does not add a replay engine or client-authored scoring. `RematchCoordinator` accepts one Results-only request per player and advances through the legal Results → Lobby → Prepare transitions after a short configurable delay.
 
 | Concern | Owner | Client responsibility |
