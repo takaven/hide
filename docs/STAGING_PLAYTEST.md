@@ -4,6 +4,8 @@
 
 Set the workspace attribute `HideEnvironment` to `Staging` in the private/unlisted staging place. Use `Development` for local Studio work. Use `Production` only after the public-release gate; its default policy disables AI fill. Set `HideHumanOnlyTest = true` for a formal human-only staging run; the server derives a cloned AI-off profile without changing IDs or gameplay code. Remove the attribute or set it to `false` to restore the selected environment profile.
 
+Build the exact private-staging place with `rojo build staging.project.json --output build/hide-staging.rbxlx`. The staging project records `HideEnvironment = Staging`, `HideHumanOnlyTest = false`, and the non-secret build label `phase2-staging-1`. Publish that generated place through Studio to the private/unlisted TAKAVEN staging experience. Record the Git SHA separately; do not encode credentials, universe IDs, or place IDs in the project file.
+
 Required future publishing values remain external placeholders: `ROBLOX_API_KEY`, `ROBLOX_UNIVERSE_ID`, and `ROBLOX_PLACE_ID`. Do not commit them.
 
 ## Cohort and session protocol

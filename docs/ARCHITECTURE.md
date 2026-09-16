@@ -70,6 +70,8 @@ The client presents contextual actions. Roblox native prompts provide phone, key
 
 `EnvironmentConfig` resolves explicit Development, Staging, and Production profiles from a workspace attribute without embedding universe/place IDs. Development and Staging may fill a session to four total participants with clearly labelled AI resort guests; Production defaults to human-only. Setting the server-owned workspace attribute `HideHumanOnlyTest` to `true` disables AI fill for a human-only staging session without changing source, place IDs, or analytics identity. AI IDs use the same player-state, hiding, noise, rescue, capture, and extraction contracts, and every participant event is marked `Human` or `AI` before it reaches a provider. `ParticipantMetrics` keeps human round outcomes in the established `escaped`, `eliminated`, and `survivors` fields while reporting AI outcomes only in separate `ai*` fields; the regression suite rejects AI inflation of human aggregates.
 
+`staging.project.json` is the reproducible publication input for the private test experience. It carries only non-secret environment attributes and maps the same repository-owned client, server, and shared source as the default project; the generated `.rbxlx` remains ignored.
+
 `HighlightTracker` observes the provider-neutral analytics bus. It derives a bounded moment-of-the-round and positive Results awards from events the server already accepted; it does not add a replay engine or client-authored scoring. `RematchCoordinator` accepts one Results-only request per player and advances through the legal Results → Lobby → Prepare transitions after a short configurable delay.
 
 | Concern | Owner | Client responsibility |
