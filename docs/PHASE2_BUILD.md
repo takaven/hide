@@ -101,3 +101,32 @@ The release pass deliberately does not add progression, monetisation, a second m
 ## Gate state
 
 This document records the Phase-2 implementation and current Studio evidence. It does not by itself approve publication, merge, or production release.
+
+## Breath + The Stop proof build
+
+The next private build is deliberately narrower than the previous staging candidate. It tests only whether Breath and The Stop create a break-and-run decision during the first minute of meaningful play.
+
+- Breath base rate: `0.014/second`.
+- Occupancy multipliers (1/2/3/4): `1.0 / 1.6 / 2.2 / 2.8`.
+- Warning / Critical / Break: `0.55 / 0.8 / 1.0`.
+- The Stop: six seconds, inside the validated 4–8 second range, applying `3x` Breath within a 30-stud room proxy.
+- The Draw: magnitude `1.75`, five-second Listener commitment, twelve-second reuse cooldown.
+- Freeform countermeasure: server-observed stationary storm evidence after twelve seconds, repeating at six-second intervals until movement resumes.
+- Empty shelters reset Breath; volunteering out gives remaining occupants `0.22` relief. Eviction and voice pressure are off by default.
+
+The source simulation produces first breaks within 60 seconds for one, two, three, and four occupants when the controlled Stop occurs. That proves the curve, not the experience. A blind player must still demonstrate that the feedback is understood, that they choose to leave, and that at least two existing resort routes/door breaks make the resulting run survivable. The current map already has two extraction routes, three physical service doors, corridor sightline breaks, and multiple room-to-corridor choices; no new art pass or objective system is included.
+
+The blind session records shelter entry and occupancy changes, Breath snapshots/rates, Stop start/end, time to first break, voluntary/forced exits, Let In/Refuse, Draw, captures/escapes, and stationary exposure duration. Run controlled one-, two-, and four-player shelter cases, then ask without coaching:
+
+1. What were you supposed to do?
+2. Why did you leave the hiding place?
+3. What happened when more players entered?
+4. What did The Listener do when it stopped?
+5. Did you feel like you were waiting?
+6. Did you want to move?
+7. What game did this remind you of?
+8. What felt new?
+9. What felt cheap?
+10. Would you play another round now?
+
+AI guests, Movie Moments, decoy items, award overlays, and persistent social memory are disabled through prototype flags. Voice pressure is an off-by-default interface flag only: a privacy-safe Roblox amplitude/activity feed has not been bound, and voice cannot delay the core test. The PR remains unmerged and the experience must remain non-public.

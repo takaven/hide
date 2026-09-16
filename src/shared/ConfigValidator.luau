@@ -72,6 +72,97 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 		end
 	end
 	local aiGuests = field(config, "AIGuests")
+	local prototype = field(config, "Prototype")
+	for _, key in ipairs({
+		"Enabled",
+		"EvictEnabled",
+		"VoicePressureEnabled",
+		"AIGuestsEnabled",
+		"MovieMomentsEnabled",
+		"DecoyItemsEnabled",
+		"SocialAwardsEnabled",
+	}) do
+		if type(field(prototype, key)) ~= "boolean" then
+			table.insert(errors, `Prototype.{key} must be boolean`)
+		end
+	end
+	local breath = field(config, "Breath")
+	for _, key in ipairs({
+		"BaseRatePerSecond",
+		"WarningThreshold",
+		"CriticalThreshold",
+		"Maximum",
+		"EmptyDecayPerSecond",
+		"ExitRelief",
+		"EntryIncreasePerOccupant",
+	}) do
+		positive(errors, `Breath.{key}`, field(breath, key), key == "ExitRelief")
+	end
+	local breathMultipliers = field(breath, "OccupancyMultipliers")
+	if type(breathMultipliers) ~= "table" or #breathMultipliers < 4 then
+		table.insert(errors, "Breath.OccupancyMultipliers must define 1-4 occupants")
+	else
+		local previous = 0
+		for index = 1, 4 do
+			local multiplier = breathMultipliers[index]
+			positive(errors, `Breath.OccupancyMultipliers.{index}`, multiplier)
+			if type(multiplier) == "number" and multiplier <= previous then
+				table.insert(errors, "Breath occupancy multipliers must strictly increase")
+			end
+			previous = if type(multiplier) == "number" then multiplier else previous
+		end
+	end
+	if type(breath) == "table" then
+		local warning = breath.WarningThreshold
+		local critical = breath.CriticalThreshold
+		local maximum = breath.Maximum
+		if
+			type(warning) ~= "number"
+			or type(critical) ~= "number"
+			or type(maximum) ~= "number"
+			or not (0 < warning and warning < critical and critical < maximum and maximum <= 1)
+		then
+			table.insert(errors, "Breath thresholds must increase within 0..1")
+		end
+	end
+	local listenerStop = field(config, "ListenerStop")
+	for _, key in ipairs({
+		"MinimumDuration",
+		"MaximumDuration",
+		"DefaultDuration",
+		"RoomRadius",
+		"BreathMultiplier",
+		"Cooldown",
+	}) do
+		positive(errors, `ListenerStop.{key}`, field(listenerStop, key))
+	end
+	if type(listenerStop) == "table" then
+		if listenerStop.MaximumDuration < listenerStop.MinimumDuration then
+			table.insert(errors, "ListenerStop.MaximumDuration must be >= MinimumDuration")
+		end
+		if
+			listenerStop.DefaultDuration < listenerStop.MinimumDuration
+			or listenerStop.DefaultDuration > listenerStop.MaximumDuration
+		then
+			table.insert(errors, "ListenerStop.DefaultDuration must be inside its duration range")
+		end
+		if listenerStop.BreathMultiplier <= 1 then
+			table.insert(errors, "ListenerStop.BreathMultiplier must exceed 1")
+		end
+	end
+	local draw = field(config, "Draw")
+	positive(errors, "Draw.Magnitude", field(draw, "Magnitude"))
+	positive(errors, "Draw.CommitDuration", field(draw, "CommitDuration"))
+	positive(errors, "Draw.Cooldown", field(draw, "Cooldown"))
+	local freeform = field(config, "FreeformPressure")
+	for _, key in ipairs({
+		"GraceSeconds",
+		"EvidenceInterval",
+		"EvidenceMagnitude",
+		"MovementThreshold",
+	}) do
+		positive(errors, `FreeformPressure.{key}`, field(freeform, key))
+	end
 	for _, key in ipairs({
 		"TargetParticipants",
 		"MaximumGuests",

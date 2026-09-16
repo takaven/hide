@@ -16,6 +16,7 @@ local Runtime = ServerScriptService.Hide.runtime
 local ActionService = require(Runtime.ActionService)
 local AIGuestService = require(Runtime.AIGuestService)
 local HighlightTracker = require(Domain.HighlightTracker)
+local PrototypeRecap = require(Domain.PrototypeRecap)
 local AnalyticsBus = require(Domain.AnalyticsBus)
 local AudioPresentationService = require(Runtime.AudioPresentationService)
 local CaptureService = require(Runtime.CaptureService)
@@ -47,6 +48,7 @@ local RoundService = require(Runtime.RoundService)
 local SilenceMonitor = require(Runtime.SilenceMonitor)
 local SoakMetricsService = require(Runtime.SoakMetricsService)
 local StormPresentationService = require(Runtime.StormPresentationService)
+local StationaryExposureService = require(Runtime.StationaryExposureService)
 local StudioTestOverrides = require(Runtime.StudioTestOverrides)
 local WorldRegistry = require(Runtime.WorldRegistry)
 local WorldBuilder = require(Runtime.WorldBuilder)
@@ -61,11 +63,15 @@ storm:Start()
 local audio = AudioPresentationService.new(worldRoot)
 
 local remotes = Remotes.create()
-local environmentName, environmentProfile = EnvironmentConfig.resolve(
+local environmentName, resolvedEnvironmentProfile = EnvironmentConfig.resolve(
 	Config,
 	workspace:GetAttribute("HideEnvironment"),
 	workspace:GetAttribute("HideHumanOnlyTest") == true
 )
+local environmentProfile = table.clone(resolvedEnvironmentProfile)
+if Config.Prototype.Enabled then
+	environmentProfile.AIGuestsEnabled = Config.Prototype.AIGuestsEnabled
+end
 workspace:SetAttribute("ResolvedHideEnvironment", environmentName)
 workspace:SetAttribute("ResolvedHumanOnlyTest", environmentProfile.HumanOnly == true)
 local analyticsProvider = if environmentProfile.AnalyticsEnabled
@@ -73,8 +79,10 @@ local analyticsProvider = if environmentProfile.AnalyticsEnabled
 	else nil
 local analytics = AnalyticsBus.new(analyticsProvider)
 local recognition = HighlightTracker.new()
+local recap = PrototypeRecap.new()
 analytics:Subscribe(function(envelope)
 	recognition:Observe(envelope)
+	recap:Observe(envelope)
 end)
 local playerStates = PlayerStates.new()
 local noise = NoiseLedger.new(Config.Noise)
@@ -139,6 +147,7 @@ local round = RoundService.new(
 	{
 		Rematch = rematch,
 		Recognition = recognition,
+		Recap = recap,
 		ParticipantIds = function()
 			return aiGuests:GetParticipantIds()
 		end,
@@ -157,10 +166,10 @@ remotes.GetStateSnapshot.OnServerInvoke = function(player: Player)
 		local hidingId = hiding:GetPlayerSpot(playerId)
 		if hidingId ~= nil then
 			snapshot.contextAction = {
-				action = "ExitHiding",
+				action = "VolunteerOut",
 				targetField = "hidingId",
 				targetId = hidingId,
-				label = "EXIT",
+				label = "VOLUNTEER OUT",
 			}
 			snapshot.peekAction = { hidingId = hidingId }
 		end
@@ -199,6 +208,7 @@ local gateway = RemoteGateway.new(Config, remotes, actionService)
 local interactions = InteractionBinder.new(Config, world, gateway)
 local silence = SilenceMonitor.new(Config, hiding, noise, analytics, remotes)
 local movementNoise = MovementNoiseService.new(Config, playerStates, noise, analytics)
+local stationaryExposure = StationaryExposureService.new(Config, playerStates, noise, analytics)
 local downedEvidence = DownedEvidenceService.new(Config, playerStates, noise)
 local statePresentation = PlayerStatePresentationService.new(playerStates, worldRoot)
 local doorPresentation =
@@ -206,6 +216,7 @@ local doorPresentation =
 local rescueInteractions = RescueInteractionService.new(Config, playerStates, rescue, gateway)
 local hunter =
 	HunterService.new(Config, world, playerStates, hiding, noise, capture, analytics, round, audio)
+actionService.Hunter = hunter
 local movieMoments = MovieMomentDirector.new({
 	Config = Config,
 	WorldRoot = worldRoot,
@@ -327,6 +338,7 @@ for _, resetter in ipairs({
 	silence,
 	presentation,
 	movementNoise,
+	stationaryExposure,
 	doorPresentation,
 	rescueInteractions,
 	downedEvidence,
@@ -337,6 +349,7 @@ for _, resetter in ipairs({
 	aiGuests,
 	rematch,
 	recognition,
+	recap,
 }) do
 	round:AddResetter(resetter)
 end
@@ -373,6 +386,7 @@ task.spawn(function()
 		rescueInteractions:Tick()
 		silence:Tick(elapsed, now)
 		movementNoise:Tick(now)
+		stationaryExposure:Tick(now)
 		downedEvidence:Tick(now)
 		statePresentation:Tick()
 		hunter:Tick(now)

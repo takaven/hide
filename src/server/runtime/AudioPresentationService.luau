@@ -26,6 +26,12 @@ local SAFE_SOUNDS: { [string]: SoundDefinition } = {
 		looped = false,
 		speed = 0.72,
 	},
+	ListenerStop = {
+		id = "rbxasset://sounds/electronicpingshort.wav",
+		volume = 0.62,
+		looped = false,
+		speed = 0.42,
+	},
 	ListenerChase = {
 		id = "rbxasset://sounds/action_falling.ogg",
 		volume = 0.3,
@@ -83,6 +89,7 @@ function AudioPresentationService.new(worldRoot: Model)
 			"ListenerFootsteps",
 			"ListenerPresence",
 			"ListenerInspect",
+			"ListenerStop",
 			"ListenerChase",
 		}) do
 			self._sounds[name] = createSound(name, hunterRoot)

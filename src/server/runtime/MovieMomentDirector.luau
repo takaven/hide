@@ -58,6 +58,9 @@ function MovieMomentDirector:_blackout(now: number)
 end
 
 function MovieMomentDirector:Trigger(kind: string, now: number): boolean
+	if self.Config.Prototype ~= nil and self.Config.Prototype.MovieMomentsEnabled ~= true then
+		return false
+	end
 	if self._count >= self.Config.MovieMoments.MaxPerRound then
 		return false
 	end
@@ -123,6 +126,9 @@ function MovieMomentDirector:Trigger(kind: string, now: number): boolean
 end
 
 function MovieMomentDirector:Tick(now: number, phase: string)
+	if self.Config.Prototype ~= nil and self.Config.Prototype.MovieMomentsEnabled ~= true then
+		return
+	end
 	if phase ~= self._phase then
 		self._phase = phase
 		self._phaseStartedAt = now

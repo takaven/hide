@@ -1,5 +1,19 @@
 # Gameplay systems
 
+## Breath prototype (current test build)
+
+The current test build validates `MOVE -> SHELTER -> SHARE / REFUSE -> PRESSURE -> BREAK -> RUN -> SHELTER AGAIN`. Shelter danger is presented as **Breath**, not as the earlier Shared Silence/heat HUD. Every occupied shelter accumulates server-owned Breath. The configured base rate is `0.014/second`; occupancy multipliers for one through four occupants are `1.0`, `1.6`, `2.2`, and `2.8`. Entering adds a small occupancy-scaled pressure pulse. Warning begins at `0.55`, Critical at `0.8`, and `1.0` breaks the shelter and makes its occupants locally inspectable. Empty shelters reset Breath; a voluntary exit gives remaining occupants `0.22` relief.
+
+When The Listener comes within the configured 30-stud room proxy of an occupied shelter, it may perform **The Stop**. It cancels movement, turns visibly into a listening state, plays a distinct spatial cue, and applies a `3x` Breath multiplier for six seconds (validated within the configurable 4–8 second range). The client receives the Stop transition immediately and changes the paired-lung pulse to **IT STOPPED. IT IS LISTENING.** If Breath breaks, the existing server evidence path leads The Listener to the shelter approach point; it does not gain map-wide occupant knowledge.
+
+The paired lung shapes intensify, pulse faster, and change from green through amber to red. They replace the generic progress-bar presentation for the prototype. Context text becomes **MORE PEOPLE = LESS TIME**, **SHHH — OR RUN**, and **BREAK — LEAVE NOW**. Let Me In remains a server-owned **LET IN / REFUSE** decision. Shelter exit is labelled **VOLUNTEER OUT** and is recorded separately. `Evict` is implemented and validated through the normal action gateway but unavailable while `Prototype.EvictEnabled = false` (the default blind-test setting).
+
+**The Draw** replaces the inventory-like decoy control. An exposed player can press **DISTRACT** to create the strongest current server-owned evidence and commit The Listener toward that position for five seconds. It has no item or inventory state, is rate-limited, and tells the player **IT HEARD YOU — RUN**. A stationary exposed player begins emitting bounded storm evidence after 12 seconds and every six seconds thereafter. This is the single prototype countermeasure to indefinite freeform hiding: it pressures movement without silently capturing the player.
+
+Prototype flags disable AI guests, Movie Moments, decoy items, and social award overlays without deleting their rollback-safe source. Results instead display a five-line maximum telemetry recap covering admissions, refusals, volunteering, forced exits (when enabled), Draw use, first shelter break, escapes, and players left behind. `VoicePressureEnabled` exists and defaults off; there is no transcription, recording, raw audio collection, or production amplitude binding in this proof.
+
+The deterministic 1/2/3/4-occupant curve and a controlled six-second Stop pass source tests. This is not a substitute for a blind Studio session: perceived clarity, survivable post-break routing, and the first-minute movement gate remain runtime validation requirements.
+
 ## Round flow
 
 Results offers large **PLAY AGAIN** and **INVITE A FRIEND — BRING SOMEONE YOU TRUST** actions. A rematch request can shorten the Results wait but never bypasses round cleanup. The invite button uses Roblox `SocialService`; HIDE does not implement custom messages or expose contact data.
@@ -16,7 +30,7 @@ Supported states are Active, Hiding, Downed, Rescued, Eliminated, Escaped, and S
 
 The first configured capture downs a player. A downed player is physically immobilised, displays a range-limited rescue marker, and emits bounded recurring server-owned evidence at magnitude `0.24`, enough to make rescue risky without overriding louder movement, doors, or decoys. Rescue requires a different eligible player to remain within range for the full duration. One rescuer owns a live attempt, but ownership is cancelled after configured range grace, disconnect, rescuer state loss, target recovery/removal, or completion-window expiry. A replacement rescuer may then start. The downed timer or capture limit eliminates the target. Successful rescue leaves the target in Rescued, an eligible recovery state that can act, hide, escape, or be captured.
 
-## Shared Silence
+## Legacy Shared Silence (retained behind the Breath prototype)
 
 Each hiding spot combines five server-owned inputs:
 
@@ -28,7 +42,7 @@ Each hiding spot combines five server-owned inputs:
 
 The result is clamped to 0–1 and classified as Safe, Warning, Unstable, or Broken. Entering, exiting, refusing entry, moving, and remaining crowded affect risk. A transition into Broken emits a FailedSilence event and compromises that hiding spot for `Hiding.ExposureDuration`. Exposure is server-owned, extends monotonically on a new break, expires automatically, and clears between rounds.
 
-The HUD separates **NOISE** (immediate shared danger) from **SUSPICION** (persistent heat), labelled Safe, Warm, Hot, or Exposed. Server snapshots are emitted at every suspicion-tier boundary even when immediate risk is otherwise unchanged, so HOT appears at the actual inspection threshold. A hiding player may use the authored `PeekPoint` for limited perception, but each peek is rate-limited and adds both server evidence and recent Shared Silence noise.
+The earlier NOISE/SUSPICION HUD is not shown in the current prototype. The underlying server heat and exposure rules remain available for rollback and continue to provide bounded evidence; Breath is the current player-facing shelter rule. A hiding player may still use the authored `PeekPoint` for limited perception, but each peek is rate-limited and adds server evidence.
 
 Hiding Heat is also a discovery rule, not merely an AI-interest signal. Occupants are discoverable during a successful local inspection when the spot is exposed **or** its heat is at least `Hiding.InspectionHeatThreshold`. The initial value `0.6` is reached after roughly 30 seconds of uninterrupted solo occupancy under the current heat settings. A cold silent spot remains safe from inspection; repeatedly or continuously relying on it eventually does not. Neither path gives The Listener map-wide knowledge: it must physically reach or complete navigation near the spot's inspection point.
 

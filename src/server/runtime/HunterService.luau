@@ -53,7 +53,110 @@ function HunterService.new(
 		_chaseStartedAt = nil,
 		_chaseClosestDistance = math.huge,
 		_spawnCFrame = nil,
+		_stopUntil = 0,
+		_stopHidingIds = {},
+		_stopCooldowns = {},
+		_drawCommitUntil = 0,
+		_drawTarget = nil,
+		_drawPlayerId = nil,
 	}, HunterService)
+end
+
+function HunterService:_endStop(now: number)
+	for _, hidingId in ipairs(self._stopHidingIds) do
+		self._hiding:SetBreathMultiplier(hidingId, 1, 0)
+	end
+	if #self._stopHidingIds > 0 then
+		self._analytics:Emit("listener_stop_ended", {
+			hidingIds = table.concat(self._stopHidingIds, ","),
+		}, now)
+	end
+	self._stopHidingIds = {}
+	self._stopUntil = 0
+	if self._hunter ~= nil then
+		self._hunter:SetAttribute("Listening", false)
+		local humanoid = self._hunter:FindFirstChildOfClass("Humanoid")
+		if humanoid ~= nil then
+			humanoid.AutoRotate = true
+		end
+	end
+end
+
+function HunterService:CommitToDraw(origin: Vector3, playerId: string, now: number)
+	self:_endStop(now)
+	if self._navigation ~= nil and self._navigation:GetStatus() ~= "Idle" then
+		self._navigation:Cancel()
+	end
+	self._lastTarget = nil
+	self._drawTarget = origin
+	self._drawPlayerId = playerId
+	self._drawCommitUntil = now + self._config.Draw.CommitDuration
+	self._analytics:Emit("listener_draw_committed", {
+		playerId = playerId,
+		duration = self._config.Draw.CommitDuration,
+	}, now)
+end
+
+function HunterService:_tryStartStop(root: BasePart, now: number): boolean
+	local state = self._brain:GetState()
+	if state == "CHASE" or state == "INVESTIGATE" or now < self._drawCommitUntil then
+		return false
+	end
+	local nearby = {}
+	for _, hidingId in ipairs(self._hiding:GetSpotIds()) do
+		local spot = self._hiding:GetSpot(hidingId)
+		if
+			spot ~= nil
+			and self._hiding:GetOccupancy(hidingId) > 0
+			and (root.Position - spot.approachPosition).Magnitude <= self._config.ListenerStop.RoomRadius
+			and now >= (self._stopCooldowns[hidingId] or 0)
+		then
+			table.insert(nearby, hidingId)
+		end
+	end
+	if #nearby == 0 then
+		return false
+	end
+	if self._navigation ~= nil and self._navigation:GetStatus() ~= "Idle" then
+		self._navigation:Cancel()
+	end
+	self._lastTarget = nil
+	self._stopHidingIds = nearby
+	self._stopUntil = now + self._config.ListenerStop.DefaultDuration
+	for _, hidingId in ipairs(nearby) do
+		self._hiding:SetBreathMultiplier(
+			hidingId,
+			self._config.ListenerStop.BreathMultiplier,
+			self._stopUntil
+		)
+		self._stopCooldowns[hidingId] = now + self._config.ListenerStop.Cooldown
+	end
+	if self._hunter ~= nil then
+		self._hunter:SetAttribute("Listening", true)
+		local humanoid = self._hunter:FindFirstChildOfClass("Humanoid")
+		if humanoid ~= nil then
+			humanoid.AutoRotate = false
+		end
+		local targetSpot = self._hiding:GetSpot(nearby[1])
+		if targetSpot ~= nil then
+			local flatTarget = Vector3.new(
+				targetSpot.approachPosition.X,
+				root.Position.Y,
+				targetSpot.approachPosition.Z
+			)
+			if (flatTarget - root.Position).Magnitude > 0.1 then
+				root.CFrame = CFrame.lookAt(root.Position, flatTarget)
+			end
+		end
+	end
+	if self._audio ~= nil then
+		self._audio:Play("ListenerStop", self._hunter)
+	end
+	self._analytics:Emit("listener_stop_started", {
+		duration = self._config.ListenerStop.DefaultDuration,
+		hidingIds = table.concat(nearby, ","),
+	}, now)
+	return true
 end
 
 function HunterService:RequestDoubleTake()
@@ -226,6 +329,7 @@ function HunterService:Start(): (boolean, string?)
 end
 
 function HunterService:ResetRound()
+	self:_endStop(0)
 	if self._navigation ~= nil and self._navigation:GetStatus() ~= "Idle" then
 		self._navigation:Cancel()
 	end
@@ -241,6 +345,10 @@ function HunterService:ResetRound()
 	self._chaseStartedAt = nil
 	self._chaseClosestDistance = math.huge
 	self._wasActive = false
+	self._stopCooldowns = {}
+	self._drawCommitUntil = 0
+	self._drawTarget = nil
+	self._drawPlayerId = nil
 	if self._hunter ~= nil and self._spawnCFrame ~= nil then
 		self._hunter:PivotTo(self._spawnCFrame)
 		local root = self:_root()
@@ -282,6 +390,43 @@ function HunterService:Tick(now: number)
 	if root == nil or self._navigation == nil then
 		return
 	end
+	local humanoid = self._hunter and self._hunter:FindFirstChildOfClass("Humanoid")
+	if now < self._drawCommitUntil and self._drawTarget ~= nil then
+		if humanoid ~= nil then
+			humanoid.WalkSpeed = self._config.Hunter.ChaseSpeed
+		end
+		local distance = (root.Position - self._drawTarget).Magnitude
+		if
+			distance > self._config.Hunter.InvestigationArrivalDistance
+			and (self._lastTarget == nil or (self._lastTarget - self._drawTarget).Magnitude > 0.1)
+		then
+			self._navigation:MoveTo(self._drawTarget)
+			self._lastTarget = self._drawTarget
+		end
+		return
+	elseif self._drawTarget ~= nil then
+		self._analytics:Emit("listener_draw_released", { playerId = self._drawPlayerId }, now)
+		if self._navigation:GetStatus() ~= "Idle" then
+			self._navigation:Cancel()
+		end
+		self._lastTarget = nil
+		self._drawTarget = nil
+		self._drawPlayerId = nil
+	end
+	if self._stopUntil > 0 then
+		if now < self._stopUntil then
+			if humanoid ~= nil then
+				humanoid.WalkSpeed = 0
+			end
+			return
+		end
+		self:_endStop(now)
+	elseif self:_tryStartStop(root, now) then
+		if humanoid ~= nil then
+			humanoid.WalkSpeed = 0
+		end
+		return
+	end
 	local visiblePlayer, visiblePosition = self:_visiblePlayer(root)
 	local previousBrainState = self._brain:GetState()
 	local navigationStatus, navigationGeneration = self._navigation:GetStatus()
@@ -312,7 +457,6 @@ function HunterService:Tick(now: number)
 				math.min(self._chaseClosestDistance, (root.Position - visiblePosition).Magnitude)
 		end
 	end
-	local humanoid = self._hunter and self._hunter:FindFirstChildOfClass("Humanoid")
 	if humanoid ~= nil then
 		humanoid.WalkSpeed = if decision.state == "CHASE"
 			then self._config.Hunter.ChaseSpeed

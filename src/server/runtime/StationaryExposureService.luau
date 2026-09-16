@@ -1,0 +1,59 @@
+--!strict
+
+local Players = game:GetService("Players")
+local StationaryPressure = require(script.Parent.Parent.domain.StationaryPressure)
+
+local StationaryExposureService = {}
+StationaryExposureService.__index = StationaryExposureService
+
+function StationaryExposureService.new(config: any, playerStates: any, noise: any, analytics: any)
+	return setmetatable({
+		_config = config,
+		_playerStates = playerStates,
+		_noise = noise,
+		_analytics = analytics,
+		_pressure = StationaryPressure.new(config.FreeformPressure),
+	}, StationaryExposureService)
+end
+
+function StationaryExposureService:ResetRound()
+	self._pressure:ResetRound()
+end
+
+function StationaryExposureService:Tick(now: number)
+	for _, player in ipairs(Players:GetPlayers()) do
+		local playerId = tostring(player.UserId)
+		local state = self._playerStates:Get(playerId)
+		local character = player.Character
+		local root = if character then character:FindFirstChild("HumanoidRootPart") else nil
+		if root and root:IsA("BasePart") then
+			local horizontal = Vector3.new(
+				root.AssemblyLinearVelocity.X,
+				0,
+				root.AssemblyLinearVelocity.Z
+			).Magnitude
+			local pressure = self._pressure:Observe(
+				playerId,
+				now,
+				state == "Active" or state == "Rescued",
+				horizontal >= self._config.FreeformPressure.MovementThreshold
+			)
+			if pressure ~= nil then
+				self._noise:Add({
+					origin = root.Position,
+					magnitude = pressure.magnitude,
+					category = "Environment",
+					sourcePlayerId = playerId,
+					sourceId = `storm-exposure-{playerId}`,
+					hunterRelevant = true,
+				}, now)
+				self._analytics:Emit("freeform_stationary_pressure", {
+					playerId = playerId,
+					duration = pressure.duration,
+				}, now)
+			end
+		end
+	end
+end
+
+return StationaryExposureService

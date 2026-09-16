@@ -25,6 +25,49 @@ return {
 		},
 	},
 
+	Prototype = {
+		Enabled = true,
+		EvictEnabled = false,
+		VoicePressureEnabled = false,
+		AIGuestsEnabled = false,
+		MovieMomentsEnabled = false,
+		DecoyItemsEnabled = false,
+		SocialAwardsEnabled = false,
+	},
+
+	Breath = {
+		BaseRatePerSecond = 0.014,
+		OccupancyMultipliers = { 1, 1.6, 2.2, 2.8 },
+		WarningThreshold = 0.55,
+		CriticalThreshold = 0.8,
+		Maximum = 1,
+		EmptyDecayPerSecond = 0.25,
+		ExitRelief = 0.22,
+		EntryIncreasePerOccupant = 0.04,
+	},
+
+	ListenerStop = {
+		MinimumDuration = 4,
+		MaximumDuration = 8,
+		DefaultDuration = 6,
+		RoomRadius = 30,
+		BreathMultiplier = 3,
+		Cooldown = 18,
+	},
+
+	Draw = {
+		Magnitude = 1.75,
+		CommitDuration = 5,
+		Cooldown = 12,
+	},
+
+	FreeformPressure = {
+		GraceSeconds = 12,
+		EvidenceInterval = 6,
+		EvidenceMagnitude = 0.42,
+		MovementThreshold = 1.5,
+	},
+
 	AIGuests = {
 		TargetParticipants = 4,
 		MaximumGuests = 3,
@@ -78,6 +121,7 @@ return {
 			Decoy = 1.0,
 			FailedSilence = 1.5,
 			Environment = 0.55,
+			Draw = 1.75,
 		},
 	},
 
@@ -193,6 +237,9 @@ return {
 			RequestHideEntry = { Limit = 4, WindowSeconds = 5 },
 			ResolveEntryRequest = { Limit = 6, WindowSeconds = 5 },
 			ExitHiding = { Limit = 3, WindowSeconds = 5 },
+			VolunteerOut = { Limit = 3, WindowSeconds = 5 },
+			Evict = { Limit = 2, WindowSeconds = 10 },
+			UseDraw = { Limit = 2, WindowSeconds = 15 },
 			HoldDoor = { Limit = 3, WindowSeconds = 5 },
 			ReleaseDoor = { Limit = 4, WindowSeconds = 5 },
 			StartRescue = { Limit = 3, WindowSeconds = 5 },

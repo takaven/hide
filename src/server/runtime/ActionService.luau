@@ -7,6 +7,7 @@ ActionService.__index = ActionService
 
 function ActionService.new(dependencies: any)
 	dependencies._lastPeek = {}
+	dependencies._lastDraw = {}
 	return setmetatable(dependencies, ActionService)
 end
 
@@ -117,13 +118,19 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 				self.Audio:Play("HidingRustle", self.WorldRegistry.Hiding[spot.id].instance)
 			end
 			self.Analytics:Emit("player_hid", { playerId = playerId, hidingId = spot.id }, now)
+			self.Analytics:Emit("occupancy_changed", {
+				hidingId = spot.id,
+				occupancy = self.Hiding:GetOccupancy(spot.id),
+				playerId = playerId,
+				reason = "entered",
+			}, now)
 			self.Remotes.StateSnapshot:FireClient(player, {
 				state = "Hiding",
 				contextAction = {
-					action = "ExitHiding",
+					action = "VolunteerOut",
 					targetField = "hidingId",
 					targetId = spot.id,
-					label = "EXIT",
+					label = "VOLUNTEER OUT",
 				},
 				peekAction = { hidingId = spot.id },
 			})
@@ -214,7 +221,11 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 				)
 				return nil, presentationError or "hiding presentation failed"
 			end
-			self.Analytics:Emit("entry_accepted", { hidingId = spot.id }, now)
+			self.Analytics:Emit("entry_accepted", {
+				hidingId = spot.id,
+				playerId = request.playerId,
+				admittedBy = playerId,
+			}, now)
 			self:_noise(
 				"HidingEntry",
 				result.noiseMagnitude,
@@ -229,13 +240,19 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 				now
 			)
 			self.Analytics:Emit("shared_hiding_started", { hidingId = spot.id }, now)
+			self.Analytics:Emit("occupancy_changed", {
+				hidingId = spot.id,
+				occupancy = self.Hiding:GetOccupancy(spot.id),
+				playerId = request.playerId,
+				reason = "admitted",
+			}, now)
 			self.Remotes.StateSnapshot:FireClient(requester, {
 				state = "Hiding",
 				contextAction = {
-					action = "ExitHiding",
+					action = "VolunteerOut",
 					targetField = "hidingId",
 					targetId = spot.id,
-					label = "EXIT",
+					label = "VOLUNTEER OUT",
 				},
 				peekAction = { hidingId = spot.id },
 			})
@@ -255,7 +272,7 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 			end
 		end
 		return result, nil
-	elseif payload.action == "ExitHiding" then
+	elseif payload.action == "ExitHiding" or payload.action == "VolunteerOut" then
 		if state ~= "Hiding" then
 			return nil, "player is not hiding"
 		end
@@ -286,6 +303,48 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 			duration = result.duration,
 			occupancy = result.occupancyAfter,
 		}, now)
+		self.Analytics:Emit("occupancy_changed", {
+			hidingId = spot.id,
+			occupancy = result.occupancyAfter,
+			playerId = playerId,
+			reason = if payload.action == "VolunteerOut" then "volunteered" else "exited",
+		}, now)
+		if payload.action == "VolunteerOut" then
+			self.Analytics:Emit("volunteered_out", {
+				playerId = playerId,
+				hidingId = spot.id,
+				breath = self.Hiding:GetBreath(spot.id),
+			}, now)
+		end
+		return result, nil
+	elseif payload.action == "Evict" then
+		if self.Config.Prototype.EvictEnabled ~= true then
+			return nil, "eviction is disabled for this playtest"
+		end
+		if state ~= "Hiding" then
+			return nil, "only a shelter occupant can evict"
+		end
+		local targetUserId = tonumber(payload.targetPlayerId)
+		local target = if targetUserId then Players:GetPlayerByUserId(targetUserId) else nil
+		if target == nil then
+			return nil, "target player is unavailable"
+		end
+		local result, err = self.Hiding:Evict(playerId, payload.targetPlayerId, now)
+		if result == nil then
+			return nil, err
+		end
+		if self.Presentation ~= nil then
+			self.Presentation:Reveal(target, result.hidingId)
+		end
+		self.PlayerStates:Transition(payload.targetPlayerId, "Active", "evicted from shelter", now)
+		self.Remotes.StateSnapshot:FireClient(target, {
+			state = "Active",
+			clearContext = true,
+			clearPeek = true,
+		})
+		local spot = self.Hiding:GetSpot(result.hidingId)
+		self:_noise("HidingExit", result.noiseMagnitude, spot.position, playerId, spot.id, now)
+		self.Analytics:Emit("forced_exit", result, now)
 		return result, nil
 	elseif payload.action == "PeekHiding" then
 		if state ~= "Hiding" or self.Hiding:GetPlayerSpot(playerId) ~= payload.hidingId then
@@ -439,6 +498,9 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 		end
 		return result, err
 	elseif payload.action == "UseDecoy" then
+		if self.Config.Prototype.DecoyItemsEnabled ~= true then
+			return nil, "decoy items are disabled for this prototype"
+		end
 		local origin = self.WorldRegistry.GetPlayerPosition(player)
 		if origin == nil then
 			return nil, "player position is unavailable"
@@ -453,6 +515,35 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 		end
 		self.Analytics:Emit("decoy_used", { playerId = playerId, decoyId = payload.decoyId }, now)
 		return { status = "Used", evidenceId = event and event.id }, nil
+	elseif payload.action == "UseDraw" then
+		if state ~= "Active" and state ~= "Rescued" then
+			return nil, "leave shelter before drawing attention"
+		end
+		local lastDraw = self._lastDraw[playerId] or -math.huge
+		if now - lastDraw < self.Config.Draw.Cooldown then
+			return nil, "the draw is cooling down"
+		end
+		local origin = self.WorldRegistry.GetPlayerPosition(player)
+		if origin == nil then
+			return nil, "player position is unavailable"
+		end
+		self._lastDraw[playerId] = now
+		local event = self.Noise:Add({
+			category = "Draw",
+			magnitude = self.Config.Draw.Magnitude,
+			origin = origin,
+			sourcePlayerId = playerId,
+			sourceId = playerId,
+			hunterRelevant = true,
+		}, now)
+		if self.Hunter ~= nil then
+			self.Hunter:CommitToDraw(origin, playerId, now)
+		end
+		self.Analytics:Emit("draw_used", {
+			playerId = playerId,
+			evidenceId = if event then event.id else nil,
+		}, now)
+		return { status = "Drawn", evidenceId = if event then event.id else nil }, nil
 	elseif payload.action == "Escape" then
 		local point = self.Extraction:Get(payload.extractionId)
 		if point == nil then

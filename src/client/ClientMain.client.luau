@@ -12,7 +12,6 @@ local actionRequest = remotesFolder:WaitForChild(Protocol.RequestEventName) :: R
 local actionResult = remotesFolder:WaitForChild(Protocol.ResultEventName) :: RemoteEvent
 local stateSnapshot = remotesFolder:WaitForChild(Protocol.SnapshotEventName) :: RemoteEvent
 local getStateSnapshot = remotesFolder:WaitForChild(Protocol.SnapshotFunctionName) :: RemoteFunction
-local SuspicionTier = require(ReplicatedStorage.Hide.Shared.SuspicionTier)
 
 local currentContext: any? = nil
 local requestCounter = 0
@@ -76,7 +75,7 @@ objectiveLabel.Text = "WAITING FOR SURVIVORS"
 objectiveLabel.Parent = top
 
 local silencePanel = Instance.new("Frame")
-silencePanel.Name = "SharedSilence"
+silencePanel.Name = "BreathPressure"
 silencePanel.AnchorPoint = Vector2.new(0.5, 1)
 silencePanel.Position = UDim2.fromScale(0.5, 0.94)
 silencePanel.Size = UDim2.new(0.76, 0, 0, 82)
@@ -99,7 +98,7 @@ silenceLabel.Font = Enum.Font.GothamBold
 silenceLabel.TextColor3 = Color3.fromRGB(225, 238, 229)
 silenceLabel.TextSize = 16
 silenceLabel.TextXAlignment = Enum.TextXAlignment.Left
-silenceLabel.Text = "SHARED SILENCE  •  QUIET"
+silenceLabel.Text = "BREATHE SLOWLY  •  CALM"
 silenceLabel.Parent = silencePanel
 local meterBack = Instance.new("Frame")
 meterBack.BackgroundColor3 = Color3.fromRGB(51, 63, 63)
@@ -107,6 +106,7 @@ meterBack.BorderSizePixel = 0
 meterBack.Position = UDim2.fromOffset(14, 34)
 meterBack.Size = UDim2.new(1, -28, 0, 12)
 meterBack.Parent = silencePanel
+meterBack.Visible = false
 local meterCorner = Instance.new("UICorner")
 meterCorner.CornerRadius = UDim.new(1, 0)
 meterCorner.Parent = meterBack
@@ -129,6 +129,22 @@ suspicionLabel.TextSize = 14
 suspicionLabel.TextXAlignment = Enum.TextXAlignment.Left
 suspicionLabel.Text = "SUSPICION  •  SAFE"
 suspicionLabel.Parent = silencePanel
+local breathLeft = Instance.new("Frame")
+breathLeft.Name = "LeftLung"
+breathLeft.AnchorPoint = Vector2.new(1, 0.5)
+breathLeft.Position = UDim2.new(0.5, -4, 0, 43)
+breathLeft.Size = UDim2.fromOffset(32, 36)
+breathLeft.BackgroundColor3 = Color3.fromRGB(68, 196, 135)
+breathLeft.BackgroundTransparency = 0.55
+breathLeft.Parent = silencePanel
+local breathLeftCorner = Instance.new("UICorner")
+breathLeftCorner.CornerRadius = UDim.new(1, 0)
+breathLeftCorner.Parent = breathLeft
+local breathRight = breathLeft:Clone()
+breathRight.Name = "RightLung"
+breathRight.AnchorPoint = Vector2.new(0, 0.5)
+breathRight.Position = UDim2.new(0.5, 4, 0, 43)
+breathRight.Parent = silencePanel
 
 local toast = Instance.new("TextLabel")
 toast.Name = "Toast"
@@ -306,10 +322,10 @@ local function bindPeek(hidingId: string)
 	styleAction("HidePeek", Color3.fromRGB(47, 103, 128))
 	if currentContext == nil then
 		currentContext = {
-			action = "ExitHiding",
+			action = "VolunteerOut",
 			targetField = "hidingId",
 			targetId = hidingId,
-			label = "EXIT",
+			label = "VOLUNTEER OUT",
 		}
 	end
 end
@@ -409,15 +425,14 @@ local function updateDecoyBinding()
 		ContextActionService:BindAction("HideUseDecoy", function(_, inputState)
 			if inputState == Enum.UserInputState.Begin then
 				actionRequest:FireServer({
-					action = "UseDecoy",
+					action = "UseDraw",
 					requestId = nextRequestId(),
-					decoyId = "storm-clicker",
 				})
 				return Enum.ContextActionResult.Sink
 			end
 			return Enum.ContextActionResult.Pass
 		end, true, Enum.KeyCode.Q, Enum.KeyCode.ButtonL1)
-		ContextActionService:SetTitle("HideUseDecoy", "DECOY")
+		ContextActionService:SetTitle("HideUseDecoy", "DISTRACT")
 		ContextActionService:SetPosition("HideUseDecoy", UDim2.fromScale(0.16, 0.48))
 		styleAction("HideUseDecoy", Color3.fromRGB(47, 103, 128))
 	end
@@ -560,38 +575,35 @@ local function applySnapshot(snapshot: any)
 		updateCamera()
 		updateSpectatorBinding()
 	end
-	if type(snapshot) == "table" and type(snapshot.silence) == "table" then
-		local silence = snapshot.silence
-		local risk = math.clamp(tonumber(silence.risk) or 0, 0, 1)
+	if type(snapshot) == "table" and type(snapshot.breath) == "table" then
+		local breath = snapshot.breath
+		local risk = math.clamp(tonumber(breath.level) or 0, 0, 1)
 		silencePanel.Visible = true
 		silenceLabel.Text =
-			`NOISE  •  {string.upper(tostring(silence.state))}  •  {silence.occupancy}/{silence.capacity}`
+			`BREATH  •  {string.upper(tostring(breath.state))}  •  {breath.occupancy}/{breath.capacity}`
 		meterFill.Size = UDim2.fromScale(risk, 1)
-		meterFill.BackgroundColor3 = if risk >= 0.85
+		local pressureColor = if risk >= Config.Breath.Maximum
 			then Color3.fromRGB(224, 53, 47)
-			elseif risk >= 0.58 then Color3.fromRGB(230, 135, 38)
-			elseif risk >= 0.35 then Color3.fromRGB(229, 197, 62)
+			elseif risk >= Config.Breath.CriticalThreshold then Color3.fromRGB(230, 135, 38)
+			elseif risk >= Config.Breath.WarningThreshold then Color3.fromRGB(229, 197, 62)
 			else Color3.fromRGB(68, 196, 135)
-		local heat = math.clamp(tonumber(silence.heat) or 0, 0, 1)
-		local tier = SuspicionTier.fromValues(Config, heat, silence.exposed == true)
-		if tier == "HOT" or tier == "EXPOSED" then
-			recordOnboarding("hot_spot", "HOT SPOTS GET CHECKED")
+		meterFill.BackgroundColor3 = pressureColor
+		breathLeft.BackgroundColor3 = pressureColor
+		breathRight.BackgroundColor3 = pressureColor
+		breathLeft.BackgroundTransparency = math.clamp(0.72 - risk * 0.62, 0.08, 0.72)
+		breathRight.BackgroundTransparency = breathLeft.BackgroundTransparency
+		local pulse = 1 + math.sin(workspace:GetServerTimeNow() * (2 + risk * 5)) * risk * 0.08
+		breathLeft.Size = UDim2.fromOffset(32 * pulse, 36 * pulse)
+		breathRight.Size = UDim2.fromOffset(32 * pulse, 36 * pulse)
+		if risk >= Config.Breath.CriticalThreshold then
+			recordOnboarding("breath_critical", "RUN — THIS SHELTER IS FAILING")
 		end
-		local suspicion = if tier == "EXPOSED"
-			then "EXPOSED — IT CAN FIND YOU"
-			elseif tier == "HOT" then "HOT — MOVE SOON"
-			elseif tier == "WARM" then "WARM — IT IS LEARNING"
-			else "SAFE"
-		suspicionLabel.Text = `SUSPICION  •  {suspicion}`
-		suspicionLabel.TextColor3 = if silence.exposed == true
-			then Color3.fromRGB(255, 92, 76)
-			elseif heat >= Config.Hiding.InspectionHeatThreshold then Color3.fromRGB(
-				239,
-				147,
-				52
-			)
-			elseif heat >= Config.Hiding.WarmHeatThreshold then Color3.fromRGB(229, 197, 62)
-			else Color3.fromRGB(138, 213, 204)
+		suspicionLabel.Text = if breath.stopActive == true
+			then `IT IS LISTENING — {math.max(1, math.ceil(tonumber(breath.stopRemaining) or 1))}`
+			elseif risk >= Config.Breath.Maximum then "BREAK — LEAVE NOW"
+			elseif risk >= Config.Breath.CriticalThreshold then "SHHH — OR RUN"
+			else "MORE PEOPLE = LESS TIME"
+		suspicionLabel.TextColor3 = pressureColor
 	end
 	if type(snapshot) == "table" and snapshot.forceExtraction == true then
 		showToast("THE RESORT IS COMPROMISED — GET OUT NOW", 3.5)
@@ -628,6 +640,10 @@ local function applySnapshot(snapshot: any)
 		recordOnboarding("rescue", "RESCUE THEM BEFORE IT RETURNS")
 	end
 	if type(snapshot) == "table" and type(snapshot.results) == "table" then
+		if type(snapshot.results.recap) == "table" then
+			resultsSummary.Text = `WHAT HAPPENED\n{table.concat(snapshot.results.recap, "\n")}`
+			return
+		end
 		local moment = snapshot.results.moment
 		local summary = if type(moment) == "table" and type(moment.label) == "string"
 			then moment.label
@@ -669,8 +685,8 @@ actionResult.OnClientEvent:Connect(function(response)
 	if response.ok ~= true then
 		warn(`[HIDE] action refused: {tostring(response.error)}`)
 		showToast(tostring(response.error or "ACTION REFUSED"), 2)
-	elseif type(response.result) == "table" and response.result.status == "Used" then
+	elseif type(response.result) == "table" and response.result.status == "Drawn" then
 		ContextActionService:UnbindAction("HideUseDecoy")
-		showToast("DECOY THROWN — MOVE NOW", 2)
+		showToast("IT HEARD YOU — RUN", 2)
 	end
 end)

@@ -24,7 +24,7 @@ mobile / keyboard / controller input
 
 ### `src/shared`
 
-- `Config.luau` is the single balance surface for players, phases, proximity, Shared Silence, noise, heat, doors, rescue, decoys, extraction, The Listener, and remote controls.
+- `Config.luau` is the single balance surface for players, phases, proximity, Breath, The Stop, noise, heat, doors, rescue, The Draw, extraction, The Listener, prototype flags, and remote controls.
 - `ConfigValidator.luau` rejects missing, non-finite, negative, or contradictory settings at server startup and in tests.
 - `RemoteProtocol.luau` and `ActionValidator.luau` declare and validate the only accepted client action shapes.
 
@@ -36,7 +36,7 @@ These modules avoid Roblox services so Lune can test their rules directly:
 
 - state machines for rounds, players, and The Listener;
 - authoritative character lifecycle cleanup across hiding, doors, rescue, and capture;
-- Shared Silence risk calculation;
+- occupancy-scaled Breath calculation and stationary freeform pressure;
 - hiding occupancy, Let Me In requests, acceptance/refusal, heat, and exposure-or-heat inspection eligibility;
 - noise creation, validation, decay, and evidence projection;
 - Hold the Door leases;
@@ -55,20 +55,20 @@ These modules avoid Roblox services so Lune can test their rules directly:
 - `ActionService` re-checks round/player state, server-derived distance, occupancy, ownership, time, and availability before mutating a domain.
 - `RoundService`, `CaptureService`, `RescueMonitor`, `RescueInteractionService`, `DownedEvidenceService`, and `SilenceMonitor` own time-dependent transitions and contextual presentation. `SilenceMonitor` treats suspicion-tier changes as snapshot boundaries instead of waiting for an unrelated risk delta.
 - `PlayerLifecycleService` translates character creation, death/reset, and player removal into one tested cleanup coordinator. `RoundPlayerReset` defines the fail-closed terminal reset plan; `PlayerStatePresentationService` executes it by relocating a secured live rig to `ArrivalSpawn` or reloading a dead/missing character before the new round.
-- `HunterService` feeds visual, noise, and heat evidence into `HunterBrain`, inspects only locally reached exposed-or-hot hiding spots, requests movement through a navigation provider, and resets both brain and physical rig to the authored start between rounds.
+- `HunterService` feeds visual, noise, heat, and broken-Breath evidence into `HunterBrain`, performs The Stop only near occupied shelters, honours a bounded Draw commitment, inspects only locally reached discoverable hiding spots, requests movement through a navigation provider, and resets both brain and physical rig to the authored start between rounds.
 - `NativeNavigationProvider` uses PathfindingService with cancellation, stuck detection, bounded replanning, and status reporting.
 - `CharacterPresentationService` conceals and immobilises hiding avatars on the server. `PlayerStatePresentationService` immobilises downed players, shows a bounded rescue marker, and makes eliminated/escaped/spectating characters non-physical and non-queryable. `DoorPresentationService` turns a server lease into a physical brace: the door is held shut while the helper is immobilised and exposed. `ExtractionRuntimeService` ejects hiders when extraction begins.
-- `MovementNoiseService` samples server-observed assembly velocity and floor material. `RobloxAnalyticsProvider` maps the allow-listed analytics bus to server-side `AnalyticsService` custom events without PII fields.
+- `MovementNoiseService` samples server-observed assembly velocity and floor material. `StationaryExposureService` adds the one fair anti-freeform-camping pressure after a server-observed stationary grace period. `RobloxAnalyticsProvider` maps the allow-listed analytics bus to server-side `AnalyticsService` custom events without PII fields.
 - `AudioPresentationService` supplies spatial Listener, hiding, door, rescue, decoy, phone, and extraction cues using redistribution-safe Roblox packaged sounds. `MovieMomentDirector` selects at most two bounded authored events per round. `SoakMetricsService` records occupancy, evidence-ledger peak, and event counts for Studio diagnostics.
 - `Remotes` creates a fixed set of remotes with class checks.
 
 ### `src/client`
 
-The client presents contextual actions. Roblox native prompts provide phone, keyboard, and controller affordances for world interactions. ContextActionService supplies large touch actions for exit, risky peek, decoy, spectator cycling, and the Let Me In accept/refuse decision. Let Me In has explicit context priority: it removes EXIT and PEEK controls while the decision is live, then restores them after resolution or expiry. The Shared Silence panel renders immediate noise separately from persistent suspicion/heat. After subscribing to events, the client invokes a read-only state snapshot function so a startup race cannot strand it in stale spectator presentation. The client never calculates authoritative success.
+The client presents contextual actions. Roblox native prompts provide phone, keyboard, and controller affordances for world interactions. ContextActionService supplies large touch actions for VOLUNTEER OUT, risky peek, DISTRACT, spectator cycling, and the Let Me In accept/refuse decision. Let Me In has explicit context priority: it removes shelter controls while the decision is live, then restores them after resolution or expiry. The Breath panel uses paired pulsing lung shapes, colour, and concise pressure language rather than exposing an authoritative numeric rule. After subscribing to events, the client invokes a read-only state snapshot function so a startup race cannot strand it in stale spectator presentation. The client never calculates authoritative success.
 
 ## Runtime ownership
 
-`EnvironmentConfig` resolves explicit Development, Staging, and Production profiles from a workspace attribute without embedding universe/place IDs. Development and Staging may fill a session to four total participants with clearly labelled AI resort guests; Production defaults to human-only. Setting the server-owned workspace attribute `HideHumanOnlyTest` to `true` disables AI fill for a human-only staging session without changing source, place IDs, or analytics identity. AI IDs use the same player-state, hiding, noise, rescue, capture, and extraction contracts, and every participant event is marked `Human` or `AI` before it reaches a provider. `ParticipantMetrics` keeps human round outcomes in the established `escaped`, `eliminated`, and `survivors` fields while reporting AI outcomes only in separate `ai*` fields; the regression suite rejects AI inflation of human aggregates.
+`EnvironmentConfig` resolves explicit Development, Staging, and Production profiles from a workspace attribute without embedding universe/place IDs. The Breath proof overrides AI fill off through `Prototype.AIGuestsEnabled = false`; no AI guest may influence the first blind result. The previous AI implementation remains source-controlled and can be re-enabled after the core thesis is decided. The existing `HideHumanOnlyTest` switch remains available for staging isolation.
 
 `staging.project.json` is the reproducible publication input for the private test experience. It carries only non-secret environment attributes and maps the same repository-owned client, server, and shared source as the default project; the generated `.rbxlx` remains ignored.
 

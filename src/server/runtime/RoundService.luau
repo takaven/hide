@@ -29,6 +29,7 @@ function RoundService.new(
 		_phaseRuntime = phaseRuntime,
 		_rematch = if options then options.Rematch else nil,
 		_recognition = if options then options.Recognition else nil,
+		_recap = if options then options.Recap else nil,
 		_participantIds = if options then options.ParticipantIds else nil,
 		_running = false,
 		_roundNumber = 0,
@@ -101,8 +102,9 @@ function RoundService:_advance(nextState: string, now: number): boolean
 		end)
 		counts.roundNumber = self._roundNumber
 		self._analytics:Emit("round_completed", counts, now)
-		local results = if self._recognition ~= nil
-			then {
+		local results = if self._recap ~= nil
+			then { recap = self._recap:BuildLines() }
+			elseif self._recognition ~= nil then {
 				moment = self._recognition:MomentOfRound(),
 				awards = self._recognition:BuildAwards(),
 			}

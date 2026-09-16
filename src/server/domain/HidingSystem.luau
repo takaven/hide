@@ -4,6 +4,9 @@ local SharedSilence = if script
 	then require(script.Parent.SharedSilence)
 	else require("./SharedSilence")
 local HidingHeat = if script then require(script.Parent.HidingHeat) else require("./HidingHeat")
+local BreathPressure = if script
+	then require(script.Parent.BreathPressure)
+	else require("./BreathPressure")
 
 local HidingSystem = {}
 HidingSystem.__index = HidingSystem
@@ -35,6 +38,10 @@ function HidingSystem:ResetRound()
 		spot.recentNoise = 0
 		spot.movementFactor = 0
 		spot.exposedUntil = 0
+		spot.breath = 0
+		spot.breathMultiplier = 1
+		spot.breathPressureUntil = 0
+		spot.firstOccupiedAt = nil
 		spot.enteredAt = {}
 	end
 	self._playerSpot = {}
@@ -70,6 +77,10 @@ function HidingSystem:Register(
 		recentNoise = 0,
 		movementFactor = 0,
 		exposedUntil = 0,
+		breath = 0,
+		breathMultiplier = 1,
+		breathPressureUntil = 0,
+		firstOccupiedAt = nil,
 	}
 	return true, nil
 end
@@ -136,11 +147,18 @@ function HidingSystem:AddRecentNoise(hidingId: string, magnitude: number): (bool
 end
 
 function HidingSystem:_enter(playerId: string, spot: any, now: number): any
+	if count(spot.occupants) == 0 then
+		spot.firstOccupiedAt = now
+	end
 	spot.occupants[playerId] = true
 	spot.enteredAt[playerId] = now
 	self._playerSpot[playerId] = spot.id
 	self._heat:RecordUse(spot.id, now)
 	spot.recentNoise = math.min(1, spot.recentNoise + self._config.Hiding.EntryNoise)
+	spot.breath = math.min(
+		self._config.Breath.Maximum,
+		spot.breath + self._config.Breath.EntryIncreasePerOccupant * count(spot.occupants)
+	)
 	return {
 		status = "Entered",
 		hidingId = spot.id,
@@ -287,6 +305,12 @@ function HidingSystem:Exit(playerId: string, hidingId: string, now: number?): (a
 	local enteredAt = spot.enteredAt[playerId]
 	spot.enteredAt[playerId] = nil
 	spot.recentNoise = math.min(1, spot.recentNoise + self._config.Hiding.ExitNoise)
+	if count(spot.occupants) == 0 then
+		spot.breath = 0
+		spot.firstOccupiedAt = nil
+	else
+		spot.breath = math.max(0, spot.breath - self._config.Breath.ExitRelief)
+	end
 	return {
 		status = "Exited",
 		hidingId = hidingId,
@@ -295,6 +319,46 @@ function HidingSystem:Exit(playerId: string, hidingId: string, now: number?): (a
 		occupancyAfter = count(spot.occupants),
 	},
 		nil
+end
+
+function HidingSystem:Evict(
+	actorPlayerId: string,
+	targetPlayerId: string,
+	now: number
+): (any?, string?)
+	local hidingId = self._playerSpot[actorPlayerId]
+	if hidingId == nil or self._playerSpot[targetPlayerId] ~= hidingId then
+		return nil, "both players must occupy the same shelter"
+	end
+	if actorPlayerId == targetPlayerId then
+		return nil, "player cannot evict themselves"
+	end
+	local result, err = self:Exit(targetPlayerId, hidingId, now)
+	if result ~= nil then
+		result.status = "Evicted"
+		result.evictedPlayerId = targetPlayerId
+		result.evictedBy = actorPlayerId
+	end
+	return result, err
+end
+
+function HidingSystem:SetBreathMultiplier(
+	hidingId: string,
+	multiplier: number,
+	pressureUntil: number?
+): boolean
+	local spot = self._spots[hidingId]
+	if spot == nil then
+		return false
+	end
+	spot.breathMultiplier = math.max(1, multiplier)
+	spot.breathPressureUntil = pressureUntil or 0
+	return true
+end
+
+function HidingSystem:GetBreath(hidingId: string): number
+	local spot = self._spots[hidingId]
+	return if spot then spot.breath else 0
 end
 
 function HidingSystem:RemovePlayer(playerId: string): any
@@ -351,7 +415,8 @@ function HidingSystem:IsDiscoverable(hidingId: string, now: number): boolean
 	if self._spots[hidingId] == nil then
 		return false
 	end
-	return self:IsExposed(hidingId, now)
+	return self:GetBreath(hidingId) >= self._config.Breath.Maximum
+		or self:IsExposed(hidingId, now)
 		or self:GetHeat(hidingId, now) >= self._config.Hiding.InspectionHeatThreshold
 end
 
@@ -384,13 +449,38 @@ function HidingSystem:Tick(
 	local heat = if occupancy > 0
 		then self._heat:TickOccupied(hidingId, occupancy, elapsed, now)
 		else self._heat:Get(hidingId, now)
-	return SharedSilence.evaluate(
+	local breath = BreathPressure.advance(
+		spot.breath,
+		occupancy,
+		elapsed,
+		spot.breathMultiplier,
+		self._config.Breath
+	)
+	spot.breath = breath.level
+	local legacy = SharedSilence.evaluate(
 		occupancy,
 		spot.recentNoise,
 		spot.movementFactor,
 		heat,
 		self._config.Hiding
 	)
+	if legacy.state == "Broken" and spot.movementFactor >= 1 then
+		breath.level = self._config.Breath.Maximum
+		breath.state = "Broken"
+		spot.breath = breath.level
+	end
+	return {
+		state = breath.state,
+		risk = breath.level,
+		level = breath.level,
+		rate = breath.rate,
+		legacyRisk = legacy.risk,
+		stopActive = spot.breathMultiplier > 1,
+		stopRemaining = math.max(0, spot.breathPressureUntil - now),
+		occupiedDuration = if spot.firstOccupiedAt
+			then math.max(0, now - spot.firstOccupiedAt)
+			else 0,
+	}
 end
 
 function HidingSystem:GetHeat(hidingId: string, now: number): number
