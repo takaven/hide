@@ -84,6 +84,19 @@ function HidingSystem:GetRequest(requestId: string): any?
 	return self._requests[requestId]
 end
 
+function HidingSystem:GetPendingRequests(hidingId: string): { any }
+	local requests = {}
+	for _, request in pairs(self._requests) do
+		if request.hidingId == hidingId and request.status == "Pending" then
+			table.insert(requests, table.clone(request))
+		end
+	end
+	table.sort(requests, function(a: any, b: any)
+		return a.createdAt < b.createdAt
+	end)
+	return requests
+end
+
 function HidingSystem:GetOccupancy(hidingId: string): number
 	local spot = self._spots[hidingId]
 	return if spot then count(spot.occupants) else 0

@@ -16,6 +16,31 @@ return {
 		},
 	},
 
+	Environment = {
+		Default = "Development",
+		Profiles = {
+			Development = { AnalyticsEnabled = false, AIGuestsEnabled = true, HumanOnly = false },
+			Staging = { AnalyticsEnabled = true, AIGuestsEnabled = true, HumanOnly = false },
+			Production = { AnalyticsEnabled = true, AIGuestsEnabled = false, HumanOnly = true },
+		},
+	},
+
+	AIGuests = {
+		TargetParticipants = 4,
+		MaximumGuests = 3,
+		ThinkInterval = 0.75,
+		WalkSpeed = 11,
+		ArrivalDistance = 4,
+		RelocateHeatThreshold = 0.52,
+		RescuePerceptionDistance = 28,
+		HunterPerceptionDistance = 32,
+	},
+
+	Rematch = {
+		MinimumRequests = 1,
+		ResultsRestartDelay = 2.5,
+	},
+
 	Interaction = {
 		MaxDistance = 12,
 		RequestLifetime = 8,
@@ -175,6 +200,9 @@ return {
 			UseDecoy = { Limit = 2, WindowSeconds = 10 },
 			Escape = { Limit = 3, WindowSeconds = 5 },
 			PeekHiding = { Limit = 6, WindowSeconds = 5 },
+			RequestRematch = { Limit = 2, WindowSeconds = 10 },
+			InviteFriend = { Limit = 2, WindowSeconds = 10 },
+			OnboardingStep = { Limit = 10, WindowSeconds = 30 },
 		},
 	},
 }

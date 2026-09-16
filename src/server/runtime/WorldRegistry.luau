@@ -42,6 +42,18 @@ local function resolveApproachPosition(instance: Instance, fallback: Vector3): V
 	return fallback
 end
 
+local function resolveExtractionPosition(instance: Instance, fallback: Vector3): Vector3
+	local approach = instance:FindFirstChild("ExtractionApproach", true)
+	if approach ~= nil then
+		if approach:IsA("BasePart") then
+			return approach.Position
+		elseif approach:IsA("Attachment") then
+			return approach.WorldPosition
+		end
+	end
+	return fallback
+end
+
 local function resolvePeekCFrame(instance: Instance): CFrame?
 	local peek = instance:FindFirstChild("PeekPoint", true)
 	if peek ~= nil and peek:IsA("BasePart") then
@@ -111,7 +123,11 @@ function WorldRegistry:Scan(): { string }
 		elseif self.Extractions[id] ~= nil then
 			table.insert(errors, `duplicate ExtractionId {id}`)
 		else
-			self.Extractions[id] = { id = id, instance = instance, position = position }
+			self.Extractions[id] = {
+				id = id,
+				instance = instance,
+				position = resolveExtractionPosition(instance, position),
+			}
 		end
 	end
 

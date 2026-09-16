@@ -2,6 +2,10 @@
 
 ## Round flow
 
+Results offers large **PLAY AGAIN** and **INVITE A FRIEND — BRING SOMEONE YOU TRUST** actions. A rematch request can shorten the Results wait but never bypasses round cleanup. The invite button uses Roblox `SocialService`; HIDE does not implement custom messages or expose contact data.
+
+Low-population Development/Staging sessions use up to three visibly labelled **AI RESORT GUESTS** to reach four total participants. Their intentionally simple loop is `SEEK_SAFETY → HIDE → RELOCATE → RESCUE → ESCAPE`. They use normal occupancy, heat, noise, rescue timing, capture, and extraction checks. R6-style Humanoid rigs remain server-owned; native paths are followed waypoint-by-waypoint, stalled paths are replanned, and repeatedly unreachable targets are temporarily suppressed instead of bypassing walls. They do not receive the Listener's evidence target or teleport to objectives, and are reconciled only between rounds as humans arrive. Human-only testing disables them through the environment profile.
+
 `Lobby -> Prepare -> Hunt -> Relocation -> Hunt -> Extraction -> Results`
 
 Durations and minimum players are configured centrally. Invalid skips are rejected by the round transition graph. The second Hunt proceeds to Extraction, which forces survivors to leave hiding.
@@ -62,10 +66,14 @@ Character creation, death/reset, and player removal invoke one server coordinato
 
 ## Extraction and spectator foundation
 
-Extraction opens only in the Extraction phase and validates eligible state, active route ID, server position, and distance. When the phase begins, every hider is server-ejected, made visible, and returned to an eligible active state. One of two routes is active per round; the final jam moment switches to the alternate route after a short warning. Escape transitions the player out of gameplay.
+Extraction opens only in the Extraction phase and validates eligible state, active route ID, server position, and distance. When the phase begins, every hider is server-ejected, made visible, and returned to an eligible active state. One of two routes is active per round; the final jam moment switches to the alternate route after a short warning. Each solid gate supplies a walkable interior `ExtractionApproach`; AI navigation and proximity validation target that point instead of the collidable gate pivot. Escape transitions the player out of gameplay.
 
 Spectators have no action path: the shared dispatcher rejects all gameplay requests before target-specific code. They may cycle only eligible living/revealed characters; hidden players are omitted. Hidden character parts are made transparent, non-collidable, non-touchable, and non-queryable by the server, and replicated player attributes do not disclose the spot ID or concealed flag. Eliminated and escaped avatars are also removed from physical/query participation. The server retains occupancy and authority.
 
 ## Analytics
+
+First-session teaching is contextual and non-blocking: **HIDE BEFORE IT HEARS YOU**, **MORE PEOPLE = MORE NOISE**, **HOT SPOTS GET CHECKED**, **LET THEM IN?**, **PEEK — BUT IT MAKES NOISE**, **RESCUE THEM BEFORE IT RETURNS**, and **GET OUT NOW** appear only when the corresponding server state or action becomes relevant.
+
+Results shows a telemetry-derived **MOMENT OF THE ROUND** plus positive recognition such as Best Rescue, Door Hero, Longest Hidden, and Final Escape when the supporting accepted event exists. These are social summaries only: no XP, currency, progression, or economy is attached.
 
 The provider-neutral server bus accepts only the declared event vocabulary. The runtime provider sends bounded, server-originated Roblox `AnalyticsService` custom events with at most three non-PII fields. Studio logs confirm emission; production dashboard ingestion still requires a published experience.

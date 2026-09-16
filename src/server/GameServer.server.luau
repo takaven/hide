@@ -8,11 +8,14 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Config = require(ReplicatedStorage.Hide.Shared.Config)
 local ConfigValidator = require(ReplicatedStorage.Hide.Shared.ConfigValidator)
+local EnvironmentConfig = require(ReplicatedStorage.Hide.Shared.EnvironmentConfig)
 
 local Domain = ServerScriptService.Hide.domain
 local Runtime = ServerScriptService.Hide.runtime
 
 local ActionService = require(Runtime.ActionService)
+local AIGuestService = require(Runtime.AIGuestService)
+local HighlightTracker = require(Domain.HighlightTracker)
 local AnalyticsBus = require(Domain.AnalyticsBus)
 local AudioPresentationService = require(Runtime.AudioPresentationService)
 local CaptureService = require(Runtime.CaptureService)
@@ -37,6 +40,7 @@ local RemoteGateway = require(Runtime.RemoteGateway)
 local Remotes = require(Runtime.Remotes)
 local RobloxAnalyticsProvider = require(Runtime.RobloxAnalyticsProvider)
 local RescueSystem = require(Domain.RescueSystem)
+local RematchCoordinator = require(Domain.RematchCoordinator)
 local RescueMonitor = require(Runtime.RescueMonitor)
 local RescueInteractionService = require(Runtime.RescueInteractionService)
 local RoundService = require(Runtime.RoundService)
@@ -57,7 +61,21 @@ storm:Start()
 local audio = AudioPresentationService.new(worldRoot)
 
 local remotes = Remotes.create()
-local analytics = AnalyticsBus.new(RobloxAnalyticsProvider.new("mauritius-le-morne-storm-resort"))
+local environmentName, environmentProfile = EnvironmentConfig.resolve(
+	Config,
+	workspace:GetAttribute("HideEnvironment"),
+	workspace:GetAttribute("HideHumanOnlyTest") == true
+)
+workspace:SetAttribute("ResolvedHideEnvironment", environmentName)
+workspace:SetAttribute("ResolvedHumanOnlyTest", environmentProfile.HumanOnly == true)
+local analyticsProvider = if environmentProfile.AnalyticsEnabled
+	then RobloxAnalyticsProvider.new("mauritius-le-morne-storm-resort")
+	else nil
+local analytics = AnalyticsBus.new(analyticsProvider)
+local recognition = HighlightTracker.new()
+analytics:Subscribe(function(envelope)
+	recognition:Observe(envelope)
+end)
 local playerStates = PlayerStates.new()
 local noise = NoiseLedger.new(Config.Noise)
 local hiding = HidingSystem.new(Config)
@@ -66,6 +84,7 @@ local rescue = RescueSystem.new(Config)
 local decoys = DecoySystem.new(Config)
 local extraction = ExtractionSystem.new(Config)
 local world = WorldRegistry.new()
+local rematch = RematchCoordinator.new(Config)
 
 for _, issue in ipairs(world:Scan()) do
 	warn(`[HIDE] world binding: {issue}`)
@@ -94,6 +113,21 @@ end
 
 local capture = CaptureService.new(Config, playerStates, hiding, analytics, remotes, presentation)
 local extractionRuntime = ExtractionRuntimeService.new(hiding, playerStates, presentation, remotes)
+local aiGuests = AIGuestService.new({
+	Config = Config,
+	Profile = environmentProfile,
+	PlayerStates = playerStates,
+	Hiding = hiding,
+	Rescue = rescue,
+	Capture = capture,
+	Extraction = extraction,
+	Noise = noise,
+	Analytics = analytics,
+	World = world,
+	Presentation = presentation,
+	Remotes = remotes,
+})
+aiGuests:Reconcile(workspace:GetServerTimeNow())
 local round = RoundService.new(
 	Config,
 	playerStates,
@@ -101,7 +135,14 @@ local round = RoundService.new(
 	decoys,
 	analytics,
 	remotes,
-	extractionRuntime
+	extractionRuntime,
+	{
+		Rematch = rematch,
+		Recognition = recognition,
+		ParticipantIds = function()
+			return aiGuests:GetParticipantIds()
+		end,
+	}
 )
 remotes.GetStateSnapshot.OnServerInvoke = function(player: Player)
 	local playerId = tostring(player.UserId)
@@ -135,7 +176,7 @@ local lifecycle = PlayerLifecycle.new({
 	Presentation = presentation,
 })
 local lifecycleService = PlayerLifecycleService.new(lifecycle, remotes)
-local rescueMonitor = RescueMonitor.new(rescue, playerStates, world, analytics)
+local rescueMonitor = RescueMonitor.new(rescue, playerStates, world, analytics, aiGuests)
 local actionService = ActionService.new({
 	Config = Config,
 	Round = round,
@@ -152,6 +193,7 @@ local actionService = ActionService.new({
 	Remotes = remotes,
 	Presentation = presentation,
 	Audio = audio,
+	Rematch = rematch,
 })
 local gateway = RemoteGateway.new(Config, remotes, actionService)
 local interactions = InteractionBinder.new(Config, world, gateway)
@@ -249,6 +291,18 @@ local function registerPlayer(player: Player)
 	local phase = round:GetState()
 	local joinActive = phase == "Lobby" or phase == "Prepare"
 	playerStates:Add(tostring(player.UserId), joinActive)
+	for _, existing in ipairs(Players:GetPlayers()) do
+		if existing ~= player then
+			local ok, friends = pcall(player.IsFriendsWith, player, existing.UserId)
+			if ok and friends then
+				analytics:Emit("invite_coplay_detected", {
+					playerId = tostring(player.UserId),
+					friendPlayerId = tostring(existing.UserId),
+				}, workspace:GetServerTimeNow())
+				break
+			end
+		end
+	end
 	lifecycleService:Attach(player)
 	remotes.StateSnapshot:FireClient(player, {
 		state = playerStates:Get(tostring(player.UserId)),
@@ -280,6 +334,9 @@ for _, resetter in ipairs({
 	hunter,
 	movieMoments,
 	soakMetrics,
+	aiGuests,
+	rematch,
+	recognition,
 }) do
 	round:AddResetter(resetter)
 end
@@ -297,7 +354,7 @@ Players.PlayerRemoving:Connect(function(player)
 	lifecycleService:Remove(player)
 	analytics:Emit(
 		"player_quit",
-		{ playerId = playerId, phase = round:GetState() },
+		{ playerId = playerId, phase = round:GetState(), state = playerStates:Get(playerId) },
 		workspace:GetServerTimeNow()
 	)
 	playerStates:Remove(playerId)
@@ -321,6 +378,7 @@ task.spawn(function()
 		hunter:Tick(now)
 		movieMoments:Tick(now, round:GetState())
 		soakMetrics:Tick(now)
+		aiGuests:Tick(now, round:GetState())
 		task.wait(0.25)
 	end
 end)

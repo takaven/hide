@@ -3,6 +3,7 @@
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local SocialService = game:GetService("SocialService")
 
 local Protocol = require(ReplicatedStorage.Hide.Shared.RemoteProtocol)
 local Config = require(ReplicatedStorage.Hide.Shared.Config)
@@ -25,6 +26,8 @@ local peekCFrame: CFrame? = nil
 local spectatorIndex = 0
 local activeExtractionId: string? = nil
 local bindContext: (any) -> ()
+local nextRequestId: () -> string
+local onboardingSeen: { [string]: boolean } = {}
 
 local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 local hud = Instance.new("ScreenGui")
@@ -145,6 +148,58 @@ toastCorner.CornerRadius = UDim.new(0, 14)
 toastCorner.Parent = toast
 local toastGeneration = 0
 
+local resultsPanel = Instance.new("Frame")
+resultsPanel.Name = "ResultsActions"
+resultsPanel.AnchorPoint = Vector2.new(0.5, 0.5)
+resultsPanel.Position = UDim2.fromScale(0.5, 0.55)
+resultsPanel.Size = UDim2.new(0.82, 0, 0, 210)
+resultsPanel.BackgroundColor3 = Color3.fromRGB(12, 24, 27)
+resultsPanel.BackgroundTransparency = 0.05
+resultsPanel.Visible = false
+resultsPanel.Parent = hud
+local resultsConstraint = Instance.new("UISizeConstraint")
+resultsConstraint.MaxSize = Vector2.new(560, 230)
+resultsConstraint.MinSize = Vector2.new(290, 190)
+resultsConstraint.Parent = resultsPanel
+local resultsCorner = Instance.new("UICorner")
+resultsCorner.CornerRadius = UDim.new(0, 16)
+resultsCorner.Parent = resultsPanel
+local resultsSummary = Instance.new("TextLabel")
+resultsSummary.BackgroundTransparency = 1
+resultsSummary.Position = UDim2.fromOffset(16, 12)
+resultsSummary.Size = UDim2.new(1, -32, 0, 92)
+resultsSummary.Font = Enum.Font.GothamBold
+resultsSummary.TextColor3 = Color3.fromRGB(241, 233, 211)
+resultsSummary.TextSize = 18
+resultsSummary.TextWrapped = true
+resultsSummary.Text = "MOMENT OF THE ROUND\nTHE STORM REMEMBERS"
+resultsSummary.Parent = resultsPanel
+
+local function makeResultsButton(text: string, position: UDim2, color: Color3): TextButton
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(0.44, 0, 0, 64)
+	button.Position = position
+	button.BackgroundColor3 = color
+	button.Font = Enum.Font.GothamBold
+	button.TextColor3 = Color3.fromRGB(255, 255, 255)
+	button.TextSize = 17
+	button.TextWrapped = true
+	button.Text = text
+	button.Parent = resultsPanel
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 13)
+	corner.Parent = button
+	return button
+end
+
+local playAgainButton =
+	makeResultsButton("PLAY AGAIN", UDim2.fromScale(0.04, 0.62), Color3.fromRGB(216, 111, 48))
+local inviteButton = makeResultsButton(
+	"INVITE A FRIEND\nBRING SOMEONE YOU TRUST",
+	UDim2.fromScale(0.52, 0.62),
+	Color3.fromRGB(47, 103, 128)
+)
+
 local function showToast(message: string, seconds: number?)
 	toastGeneration += 1
 	local generation = toastGeneration
@@ -156,6 +211,41 @@ local function showToast(message: string, seconds: number?)
 		end
 	end)
 end
+
+local function recordOnboarding(stepId: string, message: string)
+	if onboardingSeen[stepId] then
+		return
+	end
+	onboardingSeen[stepId] = true
+	showToast(message, 3)
+	actionRequest:FireServer({
+		action = "OnboardingStep",
+		requestId = nextRequestId(),
+		stepId = stepId,
+	})
+end
+
+playAgainButton.Activated:Connect(function()
+	actionRequest:FireServer({ action = "RequestRematch", requestId = nextRequestId() })
+	playAgainButton.Text = "READY"
+end)
+
+inviteButton.Activated:Connect(function()
+	actionRequest:FireServer({ action = "InviteFriend", requestId = nextRequestId() })
+	task.spawn(function()
+		local ok, canInvite =
+			pcall(SocialService.CanSendGameInviteAsync, SocialService, Players.LocalPlayer)
+		if ok and canInvite then
+			local prompted =
+				pcall(SocialService.PromptGameInvite, SocialService, Players.LocalPlayer)
+			if not prompted then
+				showToast("INVITES ARE UNAVAILABLE ON THIS DEVICE", 2)
+			end
+		else
+			showToast("INVITES ARE UNAVAILABLE ON THIS DEVICE", 2)
+		end
+	end)
+end)
 
 local function styleAction(name: string, color: Color3)
 	task.defer(function()
@@ -171,7 +261,7 @@ local function styleAction(name: string, color: Color3)
 	end)
 end
 
-local function nextRequestId(): string
+nextRequestId = function(): string
 	requestCounter += 1
 	return `{math.floor(workspace:GetServerTimeNow() * 1000)}-{requestCounter}`
 end
@@ -432,12 +522,17 @@ end)
 
 local function applySnapshot(snapshot: any)
 	if type(snapshot) == "table" and type(snapshot.phase) == "string" then
+		local previousPhase = currentPhase
 		currentPhase = snapshot.phase
 		phaseDeadline = if type(snapshot.deadline) == "number" then snapshot.deadline else 0
 		if currentPhase == "Prepare" then
-			showToast("HIDE BEFORE IT HEARS YOU", 3)
+			recordOnboarding("spawn_hide", "HIDE BEFORE IT HEARS YOU")
 		elseif currentPhase == "Extraction" then
-			showToast("GET OUT NOW", 3)
+			recordOnboarding("extraction", "GET OUT NOW")
+		end
+		resultsPanel.Visible = currentPhase == "Results"
+		if previousPhase ~= "Results" and currentPhase == "Results" then
+			playAgainButton.Text = "PLAY AGAIN"
 		end
 		updateDecoyBinding()
 	end
@@ -454,6 +549,9 @@ local function applySnapshot(snapshot: any)
 		)
 	then
 		currentState = snapshot.state
+		if currentState == "Hiding" then
+			recordOnboarding("first_hiding", "MORE PEOPLE = MORE NOISE")
+		end
 		if currentState ~= "Hiding" then
 			silencePanel.Visible = false
 			unbindPeek()
@@ -476,6 +574,9 @@ local function applySnapshot(snapshot: any)
 			else Color3.fromRGB(68, 196, 135)
 		local heat = math.clamp(tonumber(silence.heat) or 0, 0, 1)
 		local tier = SuspicionTier.fromValues(Config, heat, silence.exposed == true)
+		if tier == "HOT" or tier == "EXPOSED" then
+			recordOnboarding("hot_spot", "HOT SPOTS GET CHECKED")
+		end
 		local suspicion = if tier == "EXPOSED"
 			then "EXPOSED — IT CAN FIND YOU"
 			elseif tier == "HOT" then "HOT — MOVE SOON"
@@ -496,6 +597,7 @@ local function applySnapshot(snapshot: any)
 		showToast("THE RESORT IS COMPROMISED — GET OUT NOW", 3.5)
 	end
 	if type(snapshot) == "table" and snapshot.entryRequest ~= nil then
+		recordOnboarding("let_them_in", "LET THEM IN?")
 		bindEntryRequest(snapshot.entryRequest)
 	elseif type(snapshot) == "table" and snapshot.clearEntryRequest == true then
 		clearEntryRequest(true)
@@ -505,6 +607,7 @@ local function applySnapshot(snapshot: any)
 		unbindContext()
 	end
 	if type(snapshot) == "table" and snapshot.peekAction ~= nil then
+		recordOnboarding("peek", "PEEK — BUT IT MAKES NOISE")
 		if not entryDecisionActive then
 			bindPeek(snapshot.peekAction.hidingId)
 		end
@@ -520,6 +623,29 @@ local function applySnapshot(snapshot: any)
 	end
 	if type(snapshot) == "table" and type(snapshot.movieMoment) == "table" then
 		showToast(tostring(snapshot.movieMoment.message or "THE STORM SHIFTS"), 3)
+	end
+	if type(snapshot) == "table" and snapshot.state == "Downed" and snapshot.playerId ~= nil then
+		recordOnboarding("rescue", "RESCUE THEM BEFORE IT RETURNS")
+	end
+	if type(snapshot) == "table" and type(snapshot.results) == "table" then
+		local moment = snapshot.results.moment
+		local summary = if type(moment) == "table" and type(moment.label) == "string"
+			then moment.label
+			else "THE STORM REMEMBERS"
+		local awardLines = {}
+		if type(snapshot.results.awards) == "table" then
+			for index, award in ipairs(snapshot.results.awards) do
+				if index > 2 then
+					break
+				end
+				if type(award) == "table" and type(award.title) == "string" then
+					table.insert(awardLines, award.title)
+				end
+			end
+		end
+		resultsSummary.Text = `MOMENT OF THE ROUND\n{summary}{if #awardLines > 0
+			then "\n" .. table.concat(awardLines, "  •  ")
+			else ""}`
 	end
 end
 

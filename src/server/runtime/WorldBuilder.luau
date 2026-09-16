@@ -693,6 +693,15 @@ function WorldBuilder.Build(): Model
 		Enum.Material.Metal
 	)
 	extraction:SetAttribute("ExtractionId", "arrival-evacuation-gate")
+	local arrivalApproach = part(
+		extraction,
+		"ExtractionApproach",
+		Vector3.new(1, 1, 1),
+		Vector3.new(0, 0.5, 65),
+		Color3.new(1, 1, 1)
+	)
+	arrivalApproach.Transparency = 1
+	arrivalApproach.CanCollide = false
 	label(extraction, "CYCLONE EVACUATION  •  SORTIE / EXIT / SORTI", Enum.NormalId.Front)
 	CollectionService:AddTag(extraction, "HideExtraction")
 	local serviceExtraction = part(
@@ -704,6 +713,15 @@ function WorldBuilder.Build(): Model
 		Enum.Material.Metal
 	)
 	serviceExtraction:SetAttribute("ExtractionId", "service-coast-gate")
+	local serviceApproach = part(
+		serviceExtraction,
+		"ExtractionApproach",
+		Vector3.new(1, 1, 1),
+		Vector3.new(-95, 0.5, -20),
+		Color3.new(1, 1, 1)
+	)
+	serviceApproach.Transparency = 1
+	serviceApproach.CanCollide = false
 	label(serviceExtraction, "SORTI  •  SERVICE COAST EXIT", Enum.NormalId.Right)
 	CollectionService:AddTag(serviceExtraction, "HideExtraction")
 

@@ -47,6 +47,59 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 	for _, phase in ipairs({ "Lobby", "Prepare", "Hunt", "Relocation", "Extraction", "Results" }) do
 		positive(errors, `Round.Durations.{phase}`, field(durations, phase))
 	end
+	local environment = field(config, "Environment")
+	local profiles = field(environment, "Profiles")
+	local defaultEnvironment = field(environment, "Default")
+	if
+		type(defaultEnvironment) ~= "string"
+		or type(profiles) ~= "table"
+		or profiles[defaultEnvironment] == nil
+	then
+		table.insert(errors, "Environment.Default must name a configured profile")
+	end
+	if type(profiles) == "table" then
+		for _, profileName in ipairs({ "Development", "Staging", "Production" }) do
+			local profile = profiles[profileName]
+			if type(profile) ~= "table" then
+				table.insert(errors, `Environment.Profiles.{profileName} must be configured`)
+			elseif
+				type(profile.AnalyticsEnabled) ~= "boolean"
+				or type(profile.AIGuestsEnabled) ~= "boolean"
+				or type(profile.HumanOnly) ~= "boolean"
+			then
+				table.insert(errors, `Environment.Profiles.{profileName} flags must be boolean`)
+			end
+		end
+	end
+	local aiGuests = field(config, "AIGuests")
+	for _, key in ipairs({
+		"TargetParticipants",
+		"MaximumGuests",
+		"ThinkInterval",
+		"WalkSpeed",
+		"ArrivalDistance",
+		"RelocateHeatThreshold",
+		"RescuePerceptionDistance",
+		"HunterPerceptionDistance",
+	}) do
+		positive(errors, `AIGuests.{key}`, field(aiGuests, key), key == "MaximumGuests")
+	end
+	local targetParticipants = field(aiGuests, "TargetParticipants")
+	local maximumGuests = field(aiGuests, "MaximumGuests")
+	if
+		type(targetParticipants) == "number"
+		and type(maximumGuests) == "number"
+		and maximumGuests > targetParticipants
+	then
+		table.insert(errors, "AIGuests.MaximumGuests cannot exceed TargetParticipants")
+	end
+	local relocateHeat = field(aiGuests, "RelocateHeatThreshold")
+	if type(relocateHeat) == "number" and relocateHeat > 1 then
+		table.insert(errors, "AIGuests.RelocateHeatThreshold cannot exceed 1")
+	end
+	local rematch = field(config, "Rematch")
+	positive(errors, "Rematch.MinimumRequests", field(rematch, "MinimumRequests"))
+	positive(errors, "Rematch.ResultsRestartDelay", field(rematch, "ResultsRestartDelay"))
 
 	local interaction = field(config, "Interaction")
 	local hiding = field(config, "Hiding")

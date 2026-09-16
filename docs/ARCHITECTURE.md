@@ -68,6 +68,10 @@ The client presents contextual actions. Roblox native prompts provide phone, key
 
 ## Runtime ownership
 
+`EnvironmentConfig` resolves explicit Development, Staging, and Production profiles from a workspace attribute without embedding universe/place IDs. Development and Staging may fill a session to four total participants with clearly labelled AI resort guests; Production defaults to human-only. Setting the server-owned workspace attribute `HideHumanOnlyTest` to `true` disables AI fill for a human-only staging session without changing source, place IDs, or analytics identity. AI IDs use the same player-state, hiding, noise, rescue, capture, and extraction contracts, and every participant event is marked `Human` or `AI` before it reaches a provider. `ParticipantMetrics` keeps human round outcomes in the established `escaped`, `eliminated`, and `survivors` fields while reporting AI outcomes only in separate `ai*` fields; the regression suite rejects AI inflation of human aggregates.
+
+`HighlightTracker` observes the provider-neutral analytics bus. It derives a bounded moment-of-the-round and positive Results awards from events the server already accepted; it does not add a replay engine or client-authored scoring. `RematchCoordinator` accepts one Results-only request per player and advances through the legal Results → Lobby → Prepare transitions after a short configurable delay.
+
 | Concern | Owner | Client responsibility |
 |---|---|---|
 | Round and player state | Server | Render snapshots |
@@ -88,11 +92,11 @@ World construction is intentionally data-driven through tags and attributes:
 |---|---|---|
 | `HideHidingSpot` | BasePart or Model | `HidingId: string`, `Capacity: integer >= 1`; descendants named `HiddenPoint`, `HunterApproach`, and `PeekPoint` in the current map |
 | `HideDoor` | BasePart or Model | `DoorId: string` |
-| `HideExtraction` | BasePart or Model | `ExtractionId: string` |
+| `HideExtraction` | BasePart or Model | `ExtractionId: string`; optional descendant `ExtractionApproach` supplies the reachable activation point |
 | `HideHunter` | Model | Humanoid and HumanoidRootPart |
 | `HidePatrolPoint` | BasePart or Model | none |
 
-IDs are limited to 64 characters at the network boundary. The current `WorldBuilder` supplies six hiding spots with ten total slots, three braceable doors, two alternating extraction routes, eight patrol points, and one Listener. Every hiding spot has authored `HiddenPoint`, `HunterApproach`, and `PeekPoint` parts. The Listener uses a welded non-avatar Humanoid rig with neck-death disabled so long sessions cannot silently remove the threat. A later art pass may replace geometry while preserving these tags, attributes, and identifiers.
+IDs are limited to 64 characters at the network boundary. The current `WorldBuilder` supplies six hiding spots with ten total slots, three braceable doors, two alternating extraction routes, eight patrol points, and one Listener. Every hiding spot has authored `HiddenPoint`, `HunterApproach`, and `PeekPoint` parts. Both solid extraction gates have an interior, walkable `ExtractionApproach`; pathing and distance validation use that point instead of the collidable gate pivot. The Listener uses a welded non-avatar Humanoid rig with neck-death disabled so long sessions cannot silently remove the threat. A later art pass may replace geometry while preserving these tags, attributes, and identifiers.
 
 `HunterApproach` is the navigation-safe inspection point outside a wardrobe, bed, or cabinet. If absent, the hiding pivot is the fallback. Navigation completion, failure, cancellation, and investigation timeout are distinct brain inputs; failure never masquerades as arrival. Every movement command has a generation, and a new investigation binds the generation created for its own forced `MoveTo`. Only matching-generation arrival/completion can authorize inspection.
 

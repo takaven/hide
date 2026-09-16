@@ -45,6 +45,29 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 	if state == nil then
 		return nil, "player is not registered"
 	end
+	if payload.action == "RequestRematch" then
+		if self.Round:GetState() ~= "Results" then
+			return nil, "rematch is only available during Results"
+		end
+		local result, err = self.Rematch:Request(playerId, now)
+		if result ~= nil then
+			self.Analytics:Emit("rematch_requested", { playerId = playerId }, now)
+		end
+		return result, err
+	elseif payload.action == "InviteFriend" then
+		if self.Round:GetState() ~= "Results" then
+			return nil, "friend invites are only available during Results"
+		end
+		self.Analytics:Emit("invite_initiated", { playerId = playerId }, now)
+		return { status = "Recorded" }, nil
+	elseif payload.action == "OnboardingStep" then
+		self.Analytics:Emit(
+			"onboarding_step",
+			{ playerId = playerId, stepId = payload.stepId },
+			now
+		)
+		return { status = "Recorded" }, nil
+	end
 	if self.PlayerStates:IsSpectatorOnly(playerId) then
 		return nil, "spectators cannot perform gameplay actions"
 	end

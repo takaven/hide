@@ -18,6 +18,9 @@ RemoteProtocol.Actions = {
 	UseDecoy = true,
 	Escape = true,
 	PeekHiding = true,
+	RequestRematch = true,
+	InviteFriend = true,
+	OnboardingStep = true,
 }
 
 RemoteProtocol.TargetField = {
@@ -31,6 +34,9 @@ RemoteProtocol.TargetField = {
 	UseDecoy = "decoyId",
 	Escape = "extractionId",
 	PeekHiding = "hidingId",
+	RequestRematch = false,
+	InviteFriend = false,
+	OnboardingStep = "stepId",
 }
 
 return RemoteProtocol

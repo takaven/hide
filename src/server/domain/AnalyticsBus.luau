@@ -32,10 +32,22 @@ local ALLOWED_EVENTS = {
 	extraction_started = true,
 	player_escaped = true,
 	player_quit = true,
+	rematch_requested = true,
+	rematch_started = true,
+	invite_cta_shown = true,
+	invite_initiated = true,
+	invite_coplay_detected = true,
+	onboarding_step = true,
+	ai_guest_added = true,
+	ai_guest_removed = true,
 }
 
 function AnalyticsBus.new(provider: any?)
-	return setmetatable({ _provider = provider, _buffer = {} }, AnalyticsBus)
+	return setmetatable({ _provider = provider, _buffer = {}, _observers = {} }, AnalyticsBus)
+end
+
+function AnalyticsBus:Subscribe(observer: (any) -> ())
+	table.insert(self._observers, observer)
 end
 
 function AnalyticsBus:Emit(
@@ -46,13 +58,31 @@ function AnalyticsBus:Emit(
 	if ALLOWED_EVENTS[eventName] ~= true then
 		return false, "unknown analytics event"
 	end
+	local resolvedProperties: any = if type(properties) == "table"
+		then table.clone(properties)
+		else {}
+	local participantId = resolvedProperties.playerId
+		or resolvedProperties.rescuerId
+		or resolvedProperties.targetId
+	if participantId ~= nil and resolvedProperties.participantKind == nil then
+		resolvedProperties.participantKind = if string.sub(tostring(participantId), 1, 9)
+				== "ai-guest-"
+			then "AI"
+			else "Human"
+	end
 	local envelope = {
 		name = eventName,
-		properties = if type(properties) == "table" then table.clone(properties) else {},
+		properties = resolvedProperties,
 		timestamp = timestamp,
 		schemaVersion = 1,
 	}
 	table.insert(self._buffer, envelope)
+	for _, observer in ipairs(self._observers) do
+		local ok = pcall(observer, envelope)
+		if not ok then
+			warn("[HIDE] analytics observer failed")
+		end
+	end
 	if #self._buffer > 512 then
 		table.remove(self._buffer, 1)
 	end

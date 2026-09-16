@@ -24,7 +24,9 @@ function ActionValidator.validate(payload: any, securityConfig: any): (boolean, 
 		return false, "invalid request id"
 	end
 	local targetField = Protocol.TargetField[payload.action]
-	if not validId(payload[targetField], securityConfig.MaxTargetIdLength) then
+	if
+		targetField ~= false and not validId(payload[targetField], securityConfig.MaxTargetIdLength)
+	then
 		return false, `invalid {targetField}`
 	end
 	if payload.action == "ResolveEntryRequest" and type(payload.accepted) ~= "boolean" then
@@ -33,7 +35,10 @@ function ActionValidator.validate(payload: any, securityConfig: any): (boolean, 
 	if payload.action == "PeekHiding" and type(payload.enabled) ~= "boolean" then
 		return false, "enabled must be a boolean"
 	end
-	local allowedKeys = { action = true, requestId = true, [targetField] = true }
+	local allowedKeys = { action = true, requestId = true }
+	if targetField ~= false then
+		allowedKeys[targetField] = true
+	end
 	if payload.action == "ResolveEntryRequest" then
 		allowedKeys.accepted = true
 	elseif payload.action == "PeekHiding" then

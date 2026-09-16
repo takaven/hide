@@ -16,6 +16,7 @@ local specs = {
 	require("./specs/LifecycleAndAtomicity.spec"),
 	require("./specs/PlayableRemediation.spec"),
 	require("./specs/StagingGate.spec"),
+	require("./specs/LaunchReadiness.spec"),
 }
 
 local passed = 0

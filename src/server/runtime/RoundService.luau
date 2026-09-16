@@ -2,6 +2,7 @@
 
 local Players = game:GetService("Players")
 
+local ParticipantMetrics = require(script.Parent.Parent.domain.ParticipantMetrics)
 local RoundState = require(script.Parent.Parent.domain.RoundState)
 
 local RoundService = {}
@@ -14,7 +15,8 @@ function RoundService.new(
 	decoys: any,
 	analytics: any,
 	remotes: any,
-	phaseRuntime: any?
+	phaseRuntime: any?,
+	options: any?
 )
 	local now = workspace:GetServerTimeNow()
 	return setmetatable({
@@ -25,7 +27,11 @@ function RoundService.new(
 		_analytics = analytics,
 		_remotes = remotes,
 		_phaseRuntime = phaseRuntime,
+		_rematch = if options then options.Rematch else nil,
+		_recognition = if options then options.Recognition else nil,
+		_participantIds = if options then options.ParticipantIds else nil,
 		_running = false,
+		_roundNumber = 0,
 		_resetters = { decoys },
 	}, RoundService)
 end
@@ -47,6 +53,9 @@ function RoundService:GetDeadline(): number
 end
 
 function RoundService:_playerIds(): { string }
+	if self._participantIds ~= nil then
+		return self._participantIds()
+	end
 	local ids = {}
 	for _, player in ipairs(Players:GetPlayers()) do
 		table.insert(ids, tostring(player.UserId))
@@ -54,12 +63,17 @@ function RoundService:_playerIds(): { string }
 	return ids
 end
 
+function RoundService:_participantCount(): number
+	return #self:_playerIds()
+end
+
 function RoundService:_advance(nextState: string, now: number): boolean
-	local ok = self._state:Advance(nextState, now, #Players:GetPlayers())
+	local ok = self._state:Advance(nextState, now, self:_participantCount())
 	if not ok then
 		return false
 	end
 	if nextState == "Prepare" then
+		self._roundNumber += 1
 		for _, resetter in ipairs(self._resetters) do
 			resetter:ResetRound()
 		end
@@ -70,7 +84,11 @@ function RoundService:_advance(nextState: string, now: number): boolean
 				{ state = self._playerStates:Get(tostring(player.UserId)) }
 			)
 		end
-		self._analytics:Emit("round_started", { playerCount = #Players:GetPlayers() }, now)
+		self._analytics:Emit("round_started", {
+			playerCount = #Players:GetPlayers(),
+			aiGuestCount = math.max(0, self:_participantCount() - #Players:GetPlayers()),
+			roundNumber = self._roundNumber,
+		}, now)
 	elseif nextState == "Extraction" then
 		local activeExtractionId = self._extraction:Open(now)
 		if self._phaseRuntime ~= nil then
@@ -78,18 +96,21 @@ function RoundService:_advance(nextState: string, now: number): boolean
 		end
 		self._analytics:Emit("extraction_started", { extractionId = activeExtractionId }, now)
 	elseif nextState == "Results" then
-		local counts = { escaped = 0, eliminated = 0, survivors = 0 }
-		for _, playerId in ipairs(self:_playerIds()) do
-			local playerState = self._playerStates:Get(playerId)
-			if playerState == "Escaped" then
-				counts.escaped += 1
-			elseif playerState == "Eliminated" then
-				counts.eliminated += 1
-			elseif playerState ~= "Spectating" then
-				counts.survivors += 1
-			end
-		end
+		local counts = ParticipantMetrics.countResults(self:_playerIds(), function(playerId)
+			return self._playerStates:Get(playerId)
+		end)
+		counts.roundNumber = self._roundNumber
 		self._analytics:Emit("round_completed", counts, now)
+		local results = if self._recognition ~= nil
+			then {
+				moment = self._recognition:MomentOfRound(),
+				awards = self._recognition:BuildAwards(),
+			}
+			else nil
+		self._remotes.StateSnapshot:FireAllClients({ results = results })
+		for _, player in ipairs(Players:GetPlayers()) do
+			self._analytics:Emit("invite_cta_shown", { playerId = tostring(player.UserId) }, now)
+		end
 	end
 	self._remotes.StateSnapshot:FireAllClients({
 		phase = nextState,
@@ -104,6 +125,12 @@ function RoundService:_tick(now: number)
 		return
 	end
 	local state = self:GetState()
+	if state == "Results" and self._rematch ~= nil and self._rematch:ShouldRestart(now) then
+		if self:_advance("Lobby", now) and self:_advance("Prepare", now) then
+			self._analytics:Emit("rematch_started", { playerCount = #Players:GetPlayers() }, now)
+		end
+		return
+	end
 	if state == "Lobby" then
 		self:_advance("Prepare", now)
 	elseif state == "Prepare" or state == "Relocation" then

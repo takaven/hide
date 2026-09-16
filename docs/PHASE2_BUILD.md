@@ -75,6 +75,29 @@ Screenshots and raw bridge output are kept outside the public repository because
 - Roblox custom-event dashboard delivery cannot be verified until a staging experience is published.
 - No production place was published and no Open Cloud credential was created.
 
+## Staging and launch-readiness enhancement
+
+- Environment profiles are explicit: Development disables Roblox analytics and permits AI fill; Staging enables analytics and AI fill; Production enables analytics and is human-only by default. A workspace `HideEnvironment` attribute selects the profile, while `HideHumanOnlyTest = true` provides a server-owned, tested AI-off switch for human-only staging sessions. No place or universe ID is stored in source.
+- Up to three clearly labelled AI resort guests fill below four total participants between rounds. Their state machine uses server-owned participant domains and their analytics are marked `participantKind = AI`, so they cannot inflate human engagement.
+- Results supports an immediate, cleanup-safe rematch, Roblox-native friend invitation, server-derived social awards, and a moment-of-the-round summary.
+- First-session guidance is contextual rather than a separate tutorial. Each surfaced step is recorded through the validated action gateway.
+- `HighlightTracker` observes accepted gameplay telemetry for near misses, rescues, silence breaks, door holds, escapes, hiding duration, and bounded movie moments. It stores no replay or personal information.
+- Human and AI result aggregates are independently counted. AI escapes, eliminations, and survivors cannot increment the human outcome fields consumed by retention/replay analysis.
+- The intended private cohort is 8–20 invited testers. AI-assisted and human-only sessions must be analysed separately. Public release remains gated on an eight-human soak, lower-end device measurements, private-experience analytics delivery, and founder review of gameplay captures.
+
+## Final local launch-readiness validation
+
+- A clean Rojo-built Studio session registered one human plus three visibly labelled AI resort guests. All three retained healthy Humanoids, server network ownership, and native-path movement through the resort. A blocked route caused bounded replanning and target suppression rather than teleporting, clipping through walls, falling, or remaining in an endless jitter loop.
+- AI guests used normal hiding occupancy and heat. A human requested entry through the production remote and a hidden AI occupant accepted through the server-owned request lifecycle. Heat caused visible relocation without exposing the Listener's private evidence target.
+- A controlled local Listener capture downed the human through the normal capture system. A nearby AI produced `rescue_attempted` and `rescue_completed` and obeyed the configured rescue duration and ownership.
+- Initial extraction validation exposed `NoPath` because the target was the collidable gate pivot. Both gates now author an interior `ExtractionApproach`. The rebuilt place recorded three AI `player_escaped` events and then restored all three guests to `SEEK_SAFETY` in the following round.
+- Results rendered Play Again, Roblox-native Invite Friend, server-derived awards, and a truthful moment fallback. A production rematch request advanced through legal cleanup into the next Hunt with no stale AI, hiding, rescue, award, or highlight state. `SocialService` reported invite support and accepted the Studio prompt call.
+- Contextual onboarding and the Results actions were inspected at 20:9 phone, 16:9 phone, and tablet-landscape presets without a critical touch-control collision.
+- The native Studio capture controller completed and saved a genuine 29.112-second, 1936×1088 runtime MP4 after the founder handled Roblox's CoreGui Save/Allow flow. Metadata and integrity passed, but visual QA rejected the take: Roblox captured a blank white 3D viewport while retaining CoreGui and the repository's cue overlays. It is preserved as capture-pipeline evidence and is not claimed as shareable footage. Native capture also ignored the portrait simulator. A clean Studio restart and one OBS Record/Stop pair remain the prepared fallback.
+- Fresh StudioTestService launches requesting two and four humans both timed out before any test client registered. The final four-human attempt had an edit peer only and zero players. Population arithmetic and boundary-only reconciliation pass tests for `1+3`, `2+2`, `3+1`, and `4+0`, but the final `2+2` and `4+0` combinations do not have fresh runtime evidence on this host. This is recorded as **LOCAL TOOLING LIMITATION — TO BE VALIDATED IN PRIVATE STAGING**.
+
+The release pass deliberately does not add progression, monetisation, a second map, a second hunter, or an external feedback platform.
+
 ## Gate state
 
 This document records the Phase-2 implementation and current Studio evidence. It does not by itself approve publication, merge, or production release.
