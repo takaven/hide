@@ -35,13 +35,16 @@ function ActionValidator.validate(payload: any, securityConfig: any): (boolean, 
 	if payload.action == "PeekHiding" and type(payload.enabled) ~= "boolean" then
 		return false, "enabled must be a boolean"
 	end
+	if payload.action == "SetCrouch" and type(payload.enabled) ~= "boolean" then
+		return false, "enabled must be a boolean"
+	end
 	local allowedKeys = { action = true, requestId = true }
 	if targetField ~= false then
 		allowedKeys[targetField] = true
 	end
 	if payload.action == "ResolveEntryRequest" then
 		allowedKeys.accepted = true
-	elseif payload.action == "PeekHiding" then
+	elseif payload.action == "PeekHiding" or payload.action == "SetCrouch" then
 		allowedKeys.enabled = true
 	end
 	for key in pairs(payload) do

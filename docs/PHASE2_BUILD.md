@@ -1,5 +1,27 @@
 # Phase-2 Studio build record
 
+## Vertical slice production pass
+
+The player-facing route now includes a targeted resort art layer, an original articulated Listener,
+a blackout transition, and a three-second cooperative fuse objective. The first Relocation phase
+cuts normal lighting, leaves emergency navigation light, and activates the generator-room fuse.
+Completing it is server validated, benefits all survivors, emits high-priority evidence, attributes
+the action in analytics, and changes the world to emergency power.
+
+The Creator Store and audio provenance decision is recorded in
+`docs/VERTICAL_SLICE_ASSET_AUDIT.md`. The rig and environment remain generated from Rojo-owned
+source; Studio contains presentation instances, not unique critical logic.
+
+The movement presentation adds a server-owned crouch speed and a restrained local camera pose/FOV
+response. Shelter cameras and Peek remain the authored close-quarters presentation. The vertical
+slice deliberately does not ship a parkour system or externally uploaded avatar animation set.
+
+Fresh-runtime QA confirmed the articulated Listener joints, real blackout transition, enabled
+three-second fuse prompt, packaged spatial audio, and Galaxy A06 control layout. Roblox Studio's
+automated screenshot path returned a blank 3D viewport (UI remained visible), so no marketing image
+or visual-quality claim should be based on those captures; final art judgement still requires a
+visible Studio/OBS capture. This is an evidence-capture limitation, not a source substitute.
+
 ## Scope and source of truth
 
 This branch implements one playable source-generated map: **Ravinala Noir**, a fictional resort near a Le-Morne-inspired coast during a cyclone blackout. `default.project.json` and repository Luau remain authoritative. `WorldBuilder` creates the map before the tagged world registry binds gameplay; no critical gameplay code was authored only in Studio.

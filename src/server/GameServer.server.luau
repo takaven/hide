@@ -36,6 +36,8 @@ local MovieMomentDirector = require(Runtime.MovieMomentDirector)
 local PlayerStates = require(Domain.PlayerStates)
 local PlayerLifecycle = require(Domain.PlayerLifecycle)
 local PlayerLifecycleService = require(Runtime.PlayerLifecycleService)
+local PowerObjective = require(Domain.PowerObjective)
+local PowerObjectiveService = require(Runtime.PowerObjectiveService)
 local PlayerStatePresentationService = require(Runtime.PlayerStatePresentationService)
 local RemoteGateway = require(Runtime.RemoteGateway)
 local Remotes = require(Runtime.Remotes)
@@ -52,6 +54,7 @@ local StationaryExposureService = require(Runtime.StationaryExposureService)
 local StudioTestOverrides = require(Runtime.StudioTestOverrides)
 local WorldRegistry = require(Runtime.WorldRegistry)
 local WorldBuilder = require(Runtime.WorldBuilder)
+local ListenerPresentationService = require(Runtime.ListenerPresentationService)
 
 StudioTestOverrides.Apply(Config)
 local configValid, configErrors = ConfigValidator.validate(Config)
@@ -93,6 +96,7 @@ local decoys = DecoySystem.new(Config)
 local extraction = ExtractionSystem.new(Config)
 local world = WorldRegistry.new()
 local rematch = RematchCoordinator.new(Config)
+local powerObjective = PowerObjective.new(Config)
 
 for _, issue in ipairs(world:Scan()) do
 	warn(`[HIDE] world binding: {issue}`)
@@ -153,6 +157,17 @@ local round = RoundService.new(
 		end,
 	}
 )
+local power = PowerObjectiveService.new({
+	Config = Config,
+	Objective = powerObjective,
+	Round = round,
+	PlayerStates = playerStates,
+	Noise = noise,
+	Analytics = analytics,
+	Remotes = remotes,
+	Audio = audio,
+	WorldRoot = worldRoot,
+})
 remotes.GetStateSnapshot.OnServerInvoke = function(player: Player)
 	local playerId = tostring(player.UserId)
 	local state = playerStates:Get(playerId) or "Spectating"
@@ -161,6 +176,7 @@ remotes.GetStateSnapshot.OnServerInvoke = function(player: Player)
 		phase = round:GetState(),
 		deadline = round:GetDeadline(),
 		activeExtractionId = extraction:GetActiveId(),
+		powerState = powerObjective:GetState(),
 	}
 	if state == "Hiding" then
 		local hidingId = hiding:GetPlayerSpot(playerId)
@@ -221,6 +237,10 @@ local doorPresentation =
 local rescueInteractions = RescueInteractionService.new(Config, playerStates, rescue, gateway)
 local hunter =
 	HunterService.new(Config, world, playerStates, hiding, noise, capture, analytics, round, audio)
+local listenerModel = world.Hunters[1]
+local listenerPresentation = if listenerModel and listenerModel:IsA("Model")
+	then ListenerPresentationService.new(listenerModel)
+	else nil
 actionService.Hunter = hunter
 local movieMoments = MovieMomentDirector.new({
 	Config = Config,
@@ -355,8 +375,12 @@ for _, resetter in ipairs({
 	rematch,
 	recognition,
 	recap,
+	power,
 }) do
 	round:AddResetter(resetter)
+end
+if listenerPresentation ~= nil then
+	round:AddResetter(listenerPresentation)
 end
 
 gateway:Start()
@@ -395,6 +419,7 @@ task.spawn(function()
 		downedEvidence:Tick(now)
 		statePresentation:Tick()
 		hunter:Tick(now)
+		power:Tick(now)
 		movieMoments:Tick(now, round:GetState())
 		soakMetrics:Tick(now)
 		aiGuests:Tick(now, round:GetState())

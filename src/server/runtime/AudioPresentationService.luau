@@ -27,10 +27,10 @@ local SAFE_SOUNDS: { [string]: SoundDefinition } = {
 		speed = 0.72,
 	},
 	ListenerStop = {
-		id = "rbxasset://sounds/electronicpingshort.wav",
-		volume = 0.62,
+		id = "rbxasset://sounds/switch.wav",
+		volume = 0.72,
 		looped = false,
-		speed = 0.42,
+		speed = 0.28,
 	},
 	ListenerChase = {
 		id = "rbxasset://sounds/action_falling.ogg",
@@ -64,6 +64,20 @@ local SAFE_SOUNDS: { [string]: SoundDefinition } = {
 		looped = true,
 		speed = 1.35,
 	},
+	Draw = { id = "rbxasset://sounds/switch.wav", volume = 0.68, looped = false, speed = 0.42 },
+	FuseReset = { id = "rbxasset://sounds/switch.wav", volume = 0.8, looped = false, speed = 0.55 },
+	Blackout = {
+		id = "rbxasset://sounds/electronicpingshort.wav",
+		volume = 0.7,
+		looped = false,
+		speed = 0.28,
+	},
+	BreathCritical = {
+		id = "rbxasset://sounds/action_falling.ogg",
+		volume = 0.2,
+		looped = true,
+		speed = 0.2,
+	},
 }
 
 local function createSound(name: string, parent: Instance): Sound
@@ -76,6 +90,20 @@ local function createSound(name: string, parent: Instance): Sound
 	sound.PlaybackSpeed = definition.speed
 	sound.RollOffMinDistance = 8
 	sound.RollOffMaxDistance = 55
+	if string.find(name, "Listener") ~= nil or name == "Blackout" then
+		local equalizer = Instance.new("EqualizerSoundEffect")
+		equalizer.HighGain = -8
+		equalizer.MidGain = if name == "ListenerStop" then 3 else -2
+		equalizer.LowGain = 5
+		equalizer.Parent = sound
+		local reverb = Instance.new("ReverbSoundEffect")
+		reverb.DecayTime = 2.4
+		reverb.Density = 0.35
+		reverb.Diffusion = 0.55
+		reverb.DryLevel = -2
+		reverb.WetLevel = -12
+		reverb.Parent = sound
+	end
 	sound.Parent = parent
 	return sound
 end
@@ -102,6 +130,10 @@ function AudioPresentationService.new(worldRoot: Model)
 	if phone ~= nil then
 		self._sounds.ReceptionPhone = createSound("ReceptionPhone", phone)
 	end
+	local ambience = createSound("BreathCritical", SoundService)
+	ambience.Volume = 0
+	ambience:Play()
+	self._sounds.BreathCritical = ambience
 	return self
 end
 
@@ -133,6 +165,14 @@ function AudioPresentationService:SetHunterState(state: string, moving: boolean)
 		if state ~= "CHASE" and chase.IsPlaying then
 			chase:Stop()
 		end
+	end
+end
+
+function AudioPresentationService:SetBreathPressure(risk: number)
+	local breath = self._sounds.BreathCritical
+	if breath ~= nil then
+		breath.Volume = math.clamp((risk - 0.65) * 0.5, 0, 0.18)
+		breath.PlaybackSpeed = 0.18 + math.clamp(risk, 0, 1) * 0.18
 	end
 end
 

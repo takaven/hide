@@ -154,6 +154,21 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 	positive(errors, "Draw.Magnitude", field(draw, "Magnitude"))
 	positive(errors, "Draw.CommitDuration", field(draw, "CommitDuration"))
 	positive(errors, "Draw.Cooldown", field(draw, "Cooldown"))
+	local fuse = field(config, "Fuse")
+	positive(errors, "Fuse.InteractionDuration", field(fuse, "InteractionDuration"))
+	positive(errors, "Fuse.MaxDistance", field(fuse, "MaxDistance"))
+	positive(errors, "Fuse.NoiseMagnitude", field(fuse, "NoiseMagnitude"))
+	local movement = field(config, "Movement")
+	positive(errors, "Movement.WalkSpeed", field(movement, "WalkSpeed"))
+	positive(errors, "Movement.CrouchSpeed", field(movement, "CrouchSpeed"))
+	if
+		type(movement) ~= "table"
+		or type(movement.WalkSpeed) ~= "number"
+		or type(movement.CrouchSpeed) ~= "number"
+		or movement.CrouchSpeed >= movement.WalkSpeed
+	then
+		table.insert(errors, "Movement.CrouchSpeed must be below WalkSpeed")
+	end
 	local freeform = field(config, "FreeformPressure")
 	for _, key in ipairs({
 		"CueSeconds",

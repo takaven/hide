@@ -24,6 +24,7 @@ RemoteProtocol.Actions = {
 	RequestRematch = true,
 	InviteFriend = true,
 	OnboardingStep = true,
+	SetCrouch = true,
 }
 
 RemoteProtocol.TargetField = {
@@ -43,6 +44,7 @@ RemoteProtocol.TargetField = {
 	RequestRematch = false,
 	InviteFriend = false,
 	OnboardingStep = "stepId",
+	SetCrouch = false,
 }
 
 return RemoteProtocol

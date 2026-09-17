@@ -80,6 +80,12 @@ function RoundService:_advance(nextState: string, now: number): boolean
 		end
 		self._playerStates:ResetForRound(self:_playerIds(), now)
 		for _, player in ipairs(Players:GetPlayers()) do
+			local humanoid = if player.Character
+				then player.Character:FindFirstChildOfClass("Humanoid")
+				else nil
+			if humanoid ~= nil then
+				humanoid.WalkSpeed = self._config.Movement.WalkSpeed
+			end
 			self._remotes.StateSnapshot:FireClient(
 				player,
 				{ state = self._playerStates:Get(tostring(player.UserId)) }

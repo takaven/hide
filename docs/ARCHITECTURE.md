@@ -1,5 +1,13 @@
 # Architecture
 
+## Vertical-slice presentation boundary
+
+`PowerObjective` owns the testable blackout/fuse state. `PowerObjectiveService` binds that domain
+to the world prompt, validates character state and distance, drives lights, emits evidence and
+analytics, and broadcasts presentation snapshots. `ListenerPresentationService` reads only
+server-owned Listener state attributes and poses the source-built joints; it cannot choose targets
+or captures. `WorldBuilder` remains the source of truth for the vertical-slice art layer.
+
 ## Decision summary
 
 HIDE! uses a small, original, service-oriented Luau architecture without a gameplay framework or runtime package dependency. Deterministic domains own rules; Roblox runtime adapters own Instances, players, remotes, pathfinding, and timing. The server owns every consequential result.

@@ -543,11 +543,27 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 		if self.Hunter ~= nil then
 			self.Hunter:CommitToDraw(origin, playerId, now)
 		end
+		if self.Audio ~= nil then
+			self.Audio:Play("Draw", player.Character)
+		end
 		self.Analytics:Emit("draw_used", {
 			playerId = playerId,
 			evidenceId = if event then event.id else nil,
 		}, now)
 		return { status = "Drawn", evidenceId = if event then event.id else nil }, nil
+	elseif payload.action == "SetCrouch" then
+		if state ~= "Active" and state ~= "Rescued" then
+			return nil, "cannot crouch in the current state"
+		end
+		local character = player.Character
+		local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
+		if humanoid == nil or humanoid.Health <= 0 then
+			return nil, "character is unavailable"
+		end
+		humanoid.WalkSpeed = if payload.enabled
+			then self.Config.Movement.CrouchSpeed
+			else self.Config.Movement.WalkSpeed
+		return { status = if payload.enabled then "Crouched" else "Standing" }, nil
 	elseif payload.action == "Escape" then
 		local point = self.Extraction:Get(payload.extractionId)
 		if point == nil then

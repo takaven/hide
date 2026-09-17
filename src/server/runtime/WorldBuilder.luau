@@ -418,6 +418,24 @@ local function addRavenala(parent: Instance, position: Vector3, height: number)
 	end
 end
 
+local function joint(
+	parent: Instance,
+	name: string,
+	part0: BasePart,
+	part1: BasePart,
+	c0: CFrame,
+	c1: CFrame?
+): Motor6D
+	local motor = Instance.new("Motor6D")
+	motor.Name = name
+	motor.Part0 = part0
+	motor.Part1 = part1
+	motor.C0 = c0
+	motor.C1 = c1 or CFrame.identity
+	motor.Parent = parent
+	return motor
+end
+
 local function addListener(parent: Instance, position: Vector3)
 	local model = Instance.new("Model")
 	model.Name = "TheListener"
@@ -435,10 +453,10 @@ local function addListener(parent: Instance, position: Vector3)
 	root.CanCollide = true
 	local body = part(
 		model,
-		"ListenerBody",
-		Vector3.new(3.6, 7, 2),
-		position + Vector3.new(0, 4.4, 0),
-		Color3.fromRGB(22, 25, 27),
+		"Torso",
+		Vector3.new(3.1, 5.8, 1.65),
+		position + Vector3.new(0, 5.8, 0),
+		Color3.fromRGB(18, 24, 26),
 		Enum.Material.Fabric
 	)
 	body.Anchored = false
@@ -447,46 +465,290 @@ local function addListener(parent: Instance, position: Vector3)
 	local head = part(
 		model,
 		"Head",
-		Vector3.new(2.8, 2.2, 2.8),
-		position + Vector3.new(0, 8.6, 0),
-		Color3.fromRGB(42, 44, 41),
+		Vector3.new(2.25, 2.6, 2.1),
+		position + Vector3.new(0, 10, -0.15),
+		Color3.fromRGB(31, 39, 39),
 		Enum.Material.Slate
 	)
 	head.Anchored = false
 	head.CanCollide = false
-	for _, visual in ipairs({ body, head }) do
-		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = root
-		weld.Part1 = visual
-		weld.Parent = visual
+	joint(root, "ListenerRoot", root, body, CFrame.new(0, 2.8, 0))
+	joint(body, "ListenerNeck", body, head, CFrame.new(0, 3.25, -0.1), CFrame.new(0, -1.3, 0))
+	local limbColor = Color3.fromRGB(25, 31, 31)
+	local leftArm = part(
+		model,
+		"LeftArm",
+		Vector3.new(0.82, 6.8, 0.92),
+		position + Vector3.new(-2, 5.5, 0),
+		limbColor,
+		Enum.Material.SmoothPlastic
+	)
+	local rightArm = part(
+		model,
+		"RightArm",
+		Vector3.new(0.82, 6.8, 0.92),
+		position + Vector3.new(2, 5.5, 0),
+		limbColor,
+		Enum.Material.SmoothPlastic
+	)
+	local leftLeg = part(
+		model,
+		"LeftLeg",
+		Vector3.new(1.05, 6.7, 1.2),
+		position + Vector3.new(-0.82, 0.7, 0),
+		limbColor,
+		Enum.Material.SmoothPlastic
+	)
+	local rightLeg = part(
+		model,
+		"RightLeg",
+		Vector3.new(1.05, 6.7, 1.2),
+		position + Vector3.new(0.82, 0.7, 0),
+		limbColor,
+		Enum.Material.SmoothPlastic
+	)
+	for _, visual in ipairs({ leftArm, rightArm, leftLeg, rightLeg }) do
+		visual.Anchored = false
+		visual.CanCollide = false
 	end
+	joint(
+		body,
+		"ListenerLeftShoulder",
+		body,
+		leftArm,
+		CFrame.new(-2, 2.1, 0),
+		CFrame.new(0, 2.8, 0)
+	)
+	joint(
+		body,
+		"ListenerRightShoulder",
+		body,
+		rightArm,
+		CFrame.new(2, 2.1, 0),
+		CFrame.new(0, 2.8, 0)
+	)
+	joint(body, "ListenerLeftHip", body, leftLeg, CFrame.new(-0.85, -2.7, 0), CFrame.new(0, 2.8, 0))
+	joint(
+		body,
+		"ListenerRightHip",
+		body,
+		rightLeg,
+		CFrame.new(0.85, -2.7, 0),
+		CFrame.new(0, 2.8, 0)
+	)
+	local faceVeil = part(
+		model,
+		"FaceVeil",
+		Vector3.new(1.65, 1.8, 0.16),
+		head.Position + Vector3.new(0, -0.1, -1.08),
+		Color3.fromRGB(7, 12, 13),
+		Enum.Material.Glass
+	)
+	faceVeil.Anchored = false
+	faceVeil.CanCollide = false
+	local veilWeld = Instance.new("WeldConstraint")
+	veilWeld.Part0 = head
+	veilWeld.Part1 = faceVeil
+	veilWeld.Parent = faceVeil
 	for side = -1, 1, 2 do
 		local ear = part(
 			model,
 			"ListeningFin",
-			Vector3.new(0.35, 3.2, 2.2),
-			position + Vector3.new(side * 2, 9, 0),
-			palette.emergency,
-			Enum.Material.Neon
+			Vector3.new(0.28, 3.8, 1.9),
+			position + Vector3.new(side * 1.45, 10.1, 0),
+			Color3.fromRGB(62, 86, 82),
+			Enum.Material.CorrodedMetal
 		)
 		ear.Anchored = false
 		ear.CanCollide = false
 		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = root
+		weld.Part0 = head
 		weld.Part1 = ear
 		weld.Parent = ear
 	end
 	local humanoid = Instance.new("Humanoid")
 	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-	humanoid.HipHeight = 1.5
+	humanoid.HipHeight = 2.7
 	humanoid.WalkSpeed = 14
 	-- The Listener is an original welded rig, not an R6/R15 avatar. Without this,
 	-- Roblox eventually kills the Humanoid because the rig intentionally has no Neck Motor6D.
 	humanoid.RequiresNeck = false
 	humanoid.BreakJointsOnDeath = false
 	humanoid.Parent = model
+	model:SetAttribute("BrainState", "PATROL")
+	model:SetAttribute("ArtSource", "Original TAKAVEN procedural rig")
 	model.PrimaryPart = root
 	CollectionService:AddTag(model, "HideHunter")
+end
+
+local function addHeroArt(parent: Model)
+	local details = Instance.new("Model")
+	details.Name = "VerticalSliceArt"
+	details.Parent = parent
+	-- Reception: layered ceiling, warm timber, restrained resort furniture.
+	for x = -22, 22, 11 do
+		part(
+			details,
+			"LobbyCeilingBeam",
+			Vector3.new(0.45, 0.55, 31),
+			Vector3.new(x, 11.65, 40),
+			palette.timber,
+			Enum.Material.WoodPlanks
+		)
+	end
+	for _, position in ipairs({ Vector3.new(-15, 0.55, 39), Vector3.new(15, 0.55, 39) }) do
+		part(
+			details,
+			"LobbyRug",
+			Vector3.new(12, 0.12, 8),
+			position,
+			Color3.fromRGB(32, 101, 98),
+			Enum.Material.Fabric
+		)
+		part(
+			details,
+			"LowTable",
+			Vector3.new(5, 1.3, 3),
+			position + Vector3.new(0, 0.75, 0),
+			Color3.fromRGB(121, 81, 52),
+			Enum.Material.WoodPlanks
+		)
+	end
+	-- Guest shelter wing: door reveals, wall lights, linen carts and room numbering.
+	for index, z in ipairs({ -8, 0, 8, 16 }) do
+		local plaque = part(
+			details,
+			"SuitePlaque",
+			Vector3.new(2.1, 1.1, 0.16),
+			Vector3.new(-84.35, 5.8, z),
+			Color3.fromRGB(143, 110, 57),
+			Enum.Material.Metal
+		)
+		label(plaque, `CH {100 + index}  •  ROOM`, Enum.NormalId.Right)
+		addLight(details, Vector3.new(-82.7, 8.8, z), Color3.fromRGB(233, 188, 116), 11, false)
+	end
+	part(
+		details,
+		"LinenCart",
+		Vector3.new(4.5, 3.4, 2.5),
+		Vector3.new(-47, 1.8, -9),
+		Color3.fromRGB(189, 181, 159),
+		Enum.Material.Fabric
+	)
+	-- Service corridor: pipes, cable trays and emergency wayfinding.
+	for x = -9, 9, 6 do
+		local pipe = part(
+			details,
+			"ServicePipe",
+			Vector3.new(0.35, 54, 0.35),
+			Vector3.new(x, 10.6, -20),
+			Color3.fromRGB(101, 117, 114),
+			Enum.Material.Metal
+		)
+		pipe.Shape = Enum.PartType.Cylinder
+		pipe.CFrame *= CFrame.Angles(math.rad(90), 0, 0)
+	end
+	local serviceSign = part(
+		details,
+		"ServiceWayfinding",
+		Vector3.new(10, 2.2, 0.18),
+		Vector3.new(0, 7.7, -46.9),
+		palette.teal,
+		Enum.Material.Metal
+	)
+	label(serviceSign, "GÉNÉRATEUR  ↓  •  SORTI  ↑", Enum.NormalId.Front)
+	-- Generator hero objective.
+	local cabinet = part(
+		details,
+		"FuseCabinet",
+		Vector3.new(8, 8, 1.2),
+		Vector3.new(0, 4.2, -71.6),
+		Color3.fromRGB(47, 57, 56),
+		Enum.Material.DiamondPlate
+	)
+	local panel = part(
+		details,
+		"FusePanel",
+		Vector3.new(4.2, 4.8, 0.45),
+		Vector3.new(0, 4.3, -70.85),
+		Color3.fromRGB(201, 143, 52),
+		Enum.Material.Metal
+	)
+	panel:SetAttribute("ObjectiveId", "generator-fuse")
+	label(panel, "FUSE  •  415V", Enum.NormalId.Front)
+	for index = -1, 1 do
+		local cable = part(
+			details,
+			"GeneratorCable",
+			Vector3.new(0.22, 6, 0.22),
+			cabinet.Position + Vector3.new(index * 1.8, 6, 0),
+			Color3.fromRGB(28, 31, 31),
+			Enum.Material.Metal
+		)
+		cable.Shape = Enum.PartType.Cylinder
+	end
+	-- Pool/exterior hero view and wet route into extraction.
+	local pool = part(
+		details,
+		"RainPool",
+		Vector3.new(42, 1, 20),
+		Vector3.new(56, -0.35, 54),
+		Color3.fromRGB(25, 102, 117),
+		Enum.Material.Glass
+	)
+	pool.Transparency = 0.28
+	part(
+		details,
+		"PoolCoping",
+		Vector3.new(46, 0.35, 1),
+		Vector3.new(56, 0.15, 43.7),
+		Color3.fromRGB(198, 192, 173),
+		Enum.Material.Limestone
+	)
+	part(
+		details,
+		"PoolCoping",
+		Vector3.new(46, 0.35, 1),
+		Vector3.new(56, 0.15, 64.3),
+		Color3.fromRGB(198, 192, 173),
+		Enum.Material.Limestone
+	)
+	for _, x in ipairs({ 37, 75 }) do
+		part(
+			details,
+			"PoolCoping",
+			Vector3.new(1, 0.35, 20),
+			Vector3.new(x, 0.15, 54),
+			Color3.fromRGB(198, 192, 173),
+			Enum.Material.Limestone
+		)
+	end
+	for _, position in ipairs({
+		Vector3.new(-7, 0.05, 57),
+		Vector3.new(7, 0.05, 57),
+		Vector3.new(0, 0.05, 63),
+	}) do
+		local puddle = part(
+			details,
+			"StormPuddle",
+			Vector3.new(9, 0.08, 4),
+			position,
+			Color3.fromRGB(87, 133, 139),
+			Enum.Material.Glass
+		)
+		puddle.Transparency = 0.48
+		puddle.CanCollide = false
+	end
+	-- One readable duck-through shortcut; geometry stays open and never becomes a trap.
+	local hatch = part(
+		details,
+		"ServiceHatchFrame",
+		Vector3.new(7, 5.5, 0.5),
+		Vector3.new(-13.1, 2.8, -19),
+		Color3.fromRGB(78, 88, 86),
+		Enum.Material.CorrodedMetal
+	)
+	label(hatch, "SERVICE HATCH", Enum.NormalId.Left)
 end
 
 local function configureLighting()
@@ -888,6 +1150,7 @@ function WorldBuilder.Build(): Model
 		addLight(root, position, Color3.fromRGB(190, 210, 201), 32, false)
 	end
 	addListener(root, Vector3.new(0, 2, -57))
+	addHeroArt(root)
 	return root
 end
 

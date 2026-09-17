@@ -26,6 +26,7 @@ local peekCFrame: CFrame? = nil
 local hidingCameraCFrame: CFrame? = nil
 local spectatorIndex = 0
 local activeExtractionId: string? = nil
+local powerState = "Stable"
 local bindContext: (any) -> ()
 local nextRequestId: () -> string
 local onboardingSeen: { [string]: boolean } = {}
@@ -148,6 +149,19 @@ breathRight.Name = "RightLung"
 breathRight.AnchorPoint = Vector2.new(0, 0.5)
 breathRight.Position = UDim2.new(0.5, 4, 0, 43)
 breathRight.Parent = silencePanel
+local lungGradient = Instance.new("UIGradient")
+lungGradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(225, 244, 232)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 132, 118)),
+})
+lungGradient.Rotation = 90
+lungGradient.Parent = breathLeft
+lungGradient:Clone().Parent = breathRight
+local breathStroke = Instance.new("UIStroke")
+breathStroke.Color = Color3.fromRGB(119, 204, 186)
+breathStroke.Transparency = 0.58
+breathStroke.Thickness = 1.5
+breathStroke.Parent = silencePanel
 
 local toast = Instance.new("TextLabel")
 toast.Name = "Toast"
@@ -191,6 +205,27 @@ pressureLabel.TextSize = 20
 pressureLabel.TextWrapped = true
 pressureLabel.ZIndex = 3
 pressureLabel.Parent = freeformPressure
+
+local blackoutVeil = Instance.new("Frame")
+blackoutVeil.Name = "BlackoutVeil"
+blackoutVeil.Size = UDim2.fromScale(1, 1)
+blackoutVeil.BackgroundColor3 = Color3.fromRGB(3, 11, 14)
+blackoutVeil.BackgroundTransparency = 1
+blackoutVeil.BorderSizePixel = 0
+blackoutVeil.ZIndex = 1
+blackoutVeil.Parent = hud
+local powerNotice = Instance.new("TextLabel")
+powerNotice.AnchorPoint = Vector2.new(0.5, 0)
+powerNotice.Position = UDim2.fromScale(0.5, 0.145)
+powerNotice.Size = UDim2.new(0.76, 0, 0, 42)
+powerNotice.BackgroundTransparency = 1
+powerNotice.Font = Enum.Font.GothamBold
+powerNotice.TextColor3 = Color3.fromRGB(240, 147, 77)
+powerNotice.TextSize = 18
+powerNotice.Text = ""
+powerNotice.TextWrapped = true
+powerNotice.ZIndex = 4
+powerNotice.Parent = hud
 
 local resultsPanel = Instance.new("Frame")
 resultsPanel.Name = "ResultsActions"
@@ -610,6 +645,8 @@ local function updateRoundHud()
 		objectiveLabel.Text = if activeExtractionId == "service-coast-gate"
 			then "GET OUT NOW — SERVICE COAST EXIT"
 			else "GET OUT NOW — ARRIVAL EVACUATION GATE"
+	elseif powerState == "Blackout" then
+		objectiveLabel.Text = "POWER OUT — RESET THE FUSE IN GENERATOR"
 	else
 		objectiveLabel.Text = objectives[currentPhase] or "SURVIVE"
 	end
@@ -623,6 +660,20 @@ task.spawn(function()
 end)
 
 local function applySnapshot(snapshot: any)
+	if type(snapshot) == "table" and type(snapshot.powerState) == "string" then
+		powerState = snapshot.powerState
+		blackoutVeil.BackgroundTransparency = if powerState == "Blackout" then 0.82 else 1
+		powerNotice.Text = if powerState == "Blackout"
+			then "BLACKOUT  •  FIND THE FUSE"
+			elseif powerState == "Emergency" then "EMERGENCY POWER RESTORED"
+			else ""
+		if powerState == "Blackout" then
+			showToast("BLACKOUT — RESET THE FUSE", 3)
+		elseif powerState == "Emergency" then
+			showToast("THE FUSE DREW ITS ATTENTION", 3)
+		end
+		updateRoundHud()
+	end
 	if type(snapshot) == "table" and type(snapshot.phase) == "string" then
 		local previousPhase = currentPhase
 		currentPhase = snapshot.phase
@@ -659,6 +710,10 @@ local function applySnapshot(snapshot: any)
 		end
 		if currentState ~= "Hiding" then
 			silencePanel.Visible = false
+			local camera = workspace.CurrentCamera
+			if camera ~= nil then
+				camera.FieldOfView = 70
+			end
 			hidingCameraCFrame = nil
 			unbindPeek()
 		end
@@ -698,6 +753,11 @@ local function applySnapshot(snapshot: any)
 		local pulse = 1 + math.sin(workspace:GetServerTimeNow() * (2 + risk * 5)) * risk * 0.08
 		breathLeft.Size = UDim2.fromOffset(32 * pulse, 36 * pulse)
 		breathRight.Size = UDim2.fromOffset(32 * pulse, 36 * pulse)
+		local camera = workspace.CurrentCamera
+		if camera ~= nil then
+			camera.FieldOfView = 70 - risk * 4
+		end
+		breathStroke.Transparency = math.clamp(0.65 - risk * 0.5, 0.12, 0.65)
 		if risk >= Config.Breath.CriticalThreshold then
 			recordOnboarding("breath_critical", "RUN — THIS SHELTER IS FAILING")
 		end

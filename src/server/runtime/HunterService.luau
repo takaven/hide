@@ -142,6 +142,7 @@ function HunterService:_tryStartStop(root: BasePart, now: number): boolean
 	end
 	if self._hunter ~= nil then
 		self._hunter:SetAttribute("Listening", true)
+		self._hunter:SetAttribute("BrainState", "STOP")
 		local humanoid = self._hunter:FindFirstChildOfClass("Humanoid")
 		if humanoid ~= nil then
 			humanoid:Move(Vector3.zero)
@@ -458,6 +459,9 @@ function HunterService:Tick(now: number)
 		navigationGeneration = navigationGeneration,
 		patrolReturnPosition = self._patrolTarget,
 	})
+	if self._hunter ~= nil then
+		self._hunter:SetAttribute("BrainState", decision.state)
+	end
 	if decision.state == "CHASE" then
 		if previousBrainState ~= "CHASE" then
 			self._chaseStartedAt = now

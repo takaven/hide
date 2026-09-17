@@ -1,5 +1,13 @@
 # Gameplay systems
 
+## Vertical-slice fuse and blackout
+
+The first Relocation transition creates a real blackout rather than a full-screen effect. Main
+fixtures turn off, emergency fixtures remain readable, and the generator-room fuse becomes
+interactive. Resetting the fuse takes three exposed seconds and produces a loud, server-authored
+evidence source. Emergency power then replaces the blackout for every player. Round reset clears
+the objective and restores the authored baseline.
+
 ## Breath prototype (current test build)
 
 The current test build validates `MOVE -> SHELTER -> SHARE / REFUSE -> PRESSURE -> BREAK -> RUN -> SHELTER AGAIN`. Shelter danger is presented as **Breath**, not as the earlier Shared Silence/heat HUD. Every occupied shelter accumulates server-owned Breath. The configured base rate is `0.014/second`; occupancy multipliers for one through four occupants are `1.0`, `1.6`, `2.2`, and `2.8`. Entering adds a small occupancy-scaled pressure pulse. Warning begins at `0.55`, Critical at `0.8`, and `1.0` breaks the shelter and makes its occupants locally inspectable. Empty shelters reset Breath; a voluntary exit gives remaining occupants `0.22` relief.

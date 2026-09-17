@@ -61,6 +61,17 @@ return {
 		Cooldown = 12,
 	},
 
+	Fuse = {
+		InteractionDuration = 3,
+		MaxDistance = 10,
+		NoiseMagnitude = 1.35,
+	},
+
+	Movement = {
+		WalkSpeed = 16,
+		CrouchSpeed = 7,
+	},
+
 	FreeformPressure = {
 		CueSeconds = 6,
 		GraceSeconds = 12,
@@ -123,6 +134,7 @@ return {
 			FailedSilence = 1.5,
 			Environment = 0.55,
 			Draw = 1.75,
+			Fuse = 1.35,
 		},
 	},
 
@@ -251,6 +263,7 @@ return {
 			RequestRematch = { Limit = 2, WindowSeconds = 10 },
 			InviteFriend = { Limit = 2, WindowSeconds = 10 },
 			OnboardingStep = { Limit = 10, WindowSeconds = 30 },
+			SetCrouch = { Limit = 6, WindowSeconds = 5 },
 		},
 	},
 }
