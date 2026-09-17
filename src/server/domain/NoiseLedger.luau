@@ -101,4 +101,9 @@ function NoiseLedger:GetEvidence(now: number): { any }
 	return output
 end
 
+function NoiseLedger:GetEventCount(now: number): number
+	self:GetEvidence(now)
+	return #self._events
+end
+
 return NoiseLedger

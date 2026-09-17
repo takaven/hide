@@ -8,7 +8,8 @@ function CaptureService.new(
 	playerStates: any,
 	hiding: any,
 	analytics: any,
-	remotes: any
+	remotes: any,
+	presentation: any?
 )
 	return setmetatable({
 		_config = config,
@@ -16,6 +17,7 @@ function CaptureService.new(
 		_hiding = hiding,
 		_analytics = analytics,
 		_remotes = remotes,
+		_presentation = presentation,
 		_deadlines = {},
 		_lastCapture = {},
 	}, CaptureService)
@@ -26,13 +28,16 @@ function CaptureService:ResetRound()
 	self._lastCapture = {}
 end
 
-function CaptureService:Down(playerId: string, now: number): (boolean, string?)
+function CaptureService:Down(playerId: string, now: number, source: string?): (boolean, string?)
 	local lastCapture = self._lastCapture[playerId]
 	if lastCapture ~= nil and now - lastCapture < self._config.Hunter.CaptureCooldown then
 		return false, "capture is on cooldown"
 	end
 	local hidingId = self._hiding:GetPlayerSpot(playerId)
 	if hidingId ~= nil then
+		if self._presentation ~= nil then
+			self._presentation:RevealById(playerId, hidingId)
+		end
 		self._hiding:Exit(playerId, hidingId)
 	end
 	local ok, err =
@@ -51,14 +56,14 @@ function CaptureService:Down(playerId: string, now: number): (boolean, string?)
 		)
 		self._analytics:Emit(
 			"player_eliminated",
-			{ playerId = playerId, reason = "capture_limit" },
+			{ playerId = playerId, reason = "capture_limit", source = source or "unknown" },
 			now
 		)
 	else
 		self._deadlines[playerId] = now + self._config.Rescue.DownedDuration
 		self._analytics:Emit(
 			"player_downed",
-			{ playerId = playerId, captureCount = captureCount },
+			{ playerId = playerId, captureCount = captureCount, source = source or "unknown" },
 			now
 		)
 	end

@@ -92,4 +92,13 @@ function DoorSystem:Get(doorId: string): any?
 	return self._doors[doorId]
 end
 
+function DoorSystem:GetHeldByPlayer(playerId: string): string?
+	for doorId, door in pairs(self._doors) do
+		if door.heldBy == playerId then
+			return doorId
+		end
+	end
+	return nil
+end
+
 return DoorSystem

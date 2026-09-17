@@ -5,24 +5,39 @@ local Players = game:GetService("Players")
 local RescueMonitor = {}
 RescueMonitor.__index = RescueMonitor
 
-function RescueMonitor.new(rescue: any, playerStates: any, world: any)
-	return setmetatable(
-		{ _rescue = rescue, _playerStates = playerStates, _world = world },
-		RescueMonitor
-	)
+function RescueMonitor.new(
+	rescue: any,
+	playerStates: any,
+	world: any,
+	analytics: any?,
+	aiGuests: any?
+)
+	return setmetatable({
+		_rescue = rescue,
+		_playerStates = playerStates,
+		_world = world,
+		_analytics = analytics,
+		_aiGuests = aiGuests,
+	}, RescueMonitor)
 end
 
 function RescueMonitor:Tick(now: number): { any }
-	return self._rescue:Tick(now, function(attempt)
+	local cancelled = self._rescue:Tick(now, function(attempt)
 		local rescuerUserId = tonumber(attempt.rescuerId)
 		local targetUserId = tonumber(attempt.targetId)
 		local rescuer = if rescuerUserId then Players:GetPlayerByUserId(rescuerUserId) else nil
 		local target = if targetUserId then Players:GetPlayerByUserId(targetUserId) else nil
-		local rescuerPosition = if rescuer then self._world.GetPlayerPosition(rescuer) else nil
-		local targetPosition = if target then self._world.GetPlayerPosition(target) else nil
+		local rescuerPosition = if rescuer
+			then self._world.GetPlayerPosition(rescuer)
+			elseif self._aiGuests then self._aiGuests:GetPosition(attempt.rescuerId)
+			else nil
+		local targetPosition = if target
+			then self._world.GetPlayerPosition(target)
+			elseif self._aiGuests then self._aiGuests:GetPosition(attempt.targetId)
+			else nil
 		return {
-			rescuerConnected = rescuer ~= nil,
-			targetConnected = target ~= nil,
+			rescuerConnected = rescuer ~= nil or rescuerPosition ~= nil,
+			targetConnected = target ~= nil or targetPosition ~= nil,
 			rescuerState = self._playerStates:Get(attempt.rescuerId),
 			targetState = self._playerStates:Get(attempt.targetId),
 			distance = if rescuerPosition and targetPosition
@@ -30,6 +45,16 @@ function RescueMonitor:Tick(now: number): { any }
 				else nil,
 		}
 	end)
+	if self._analytics ~= nil then
+		for _, attempt in ipairs(cancelled) do
+			self._analytics:Emit("rescue_cancelled", {
+				rescuerId = attempt.rescuerId,
+				targetId = attempt.targetId,
+				reason = attempt.cancelReason,
+			}, now)
+		end
+	end
+	return cancelled
 end
 
 return RescueMonitor

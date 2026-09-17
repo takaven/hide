@@ -31,6 +31,7 @@ function Remotes.create(): any
 		ActionRequest = getOrCreate(folder, "RemoteEvent", Protocol.RequestEventName) :: RemoteEvent,
 		ActionResult = getOrCreate(folder, "RemoteEvent", Protocol.ResultEventName) :: RemoteEvent,
 		StateSnapshot = getOrCreate(folder, "RemoteEvent", Protocol.SnapshotEventName) :: RemoteEvent,
+		GetStateSnapshot = getOrCreate(folder, "RemoteFunction", Protocol.SnapshotFunctionName) :: RemoteFunction,
 	}
 end
 

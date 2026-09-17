@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, phase-1/core-foundation]
+    branches: [main, phase-1/core-foundation, phase-2/mauritius-playable]
   pull_request:
     branches: [main]
 
@@ -59,3 +59,4 @@ jobs:
         run: |
           mkdir -p build
           rojo build default.project.json --output build/hide.rbxlx
+          rojo build staging.project.json --output build/hide-staging.rbxlx

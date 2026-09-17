@@ -1,0 +1,45 @@
+{
+  "name": "HIDE Staging",
+  "serveAddress": "127.0.0.1",
+  "tree": {
+    "$className": "DataModel",
+    "Lighting": {
+      "$className": "Lighting",
+      "$properties": {
+        "LightingStyle": "Soft"
+      }
+    },
+    "Workspace": {
+      "$className": "Workspace",
+      "$attributes": {
+        "HideEnvironment": "Staging",
+        "HideHumanOnlyTest": false,
+        "HideBuildVersion": "phase2-staging-1"
+      }
+    },
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Hide": {
+        "$className": "Folder",
+        "Shared": {
+          "$path": "src/shared"
+        }
+      }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "Hide": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "HideClient": {
+          "$path": "src/client"
+        }
+      }
+    }
+  }
+}

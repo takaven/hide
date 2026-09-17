@@ -83,6 +83,20 @@ function RescueSystem:CancelByPlayer(playerId: string, reason: string, now: numb
 	return cancelled
 end
 
+function RescueSystem:Cancel(
+	attemptId: string,
+	rescuerId: string,
+	reason: string,
+	now: number
+): boolean
+	local attempt = self._attempts[attemptId]
+	if attempt == nil or attempt.status ~= "InProgress" or attempt.rescuerId ~= rescuerId then
+		return false
+	end
+	self:_cancel(attempt, reason, now)
+	return true
+end
+
 function RescueSystem:Tick(now: number, statusProvider: (any) -> any): { any }
 	local cancelled = {}
 	for _, attempt in pairs(self._attempts) do
