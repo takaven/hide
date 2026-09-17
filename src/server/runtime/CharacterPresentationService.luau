@@ -122,7 +122,7 @@ function CharacterPresentationService:Reveal(player: Player, hidingId: string?):
 		humanoidState.instance.DisplayDistanceType = humanoidState.displayDistanceType
 	end
 	local record = if hidingId then self._world.Hiding[hidingId] else nil
-	local exitPoint = findPoint(record, "HunterApproach")
+	local exitPoint = findPoint(record, "ExitPoint") or findPoint(record, "HunterApproach")
 	character:PivotTo(if exitPoint then exitPoint.CFrame + Vector3.new(0, 2, 0) else saved.pivot)
 	self._hidden[playerId] = nil
 	return true

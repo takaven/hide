@@ -62,6 +62,7 @@ return {
 	},
 
 	FreeformPressure = {
+		CueSeconds = 6,
 		GraceSeconds = 12,
 		EvidenceInterval = 6,
 		EvidenceMagnitude = 0.42,

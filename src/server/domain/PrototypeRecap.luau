@@ -13,6 +13,7 @@ end
 
 function PrototypeRecap:Observe(envelope: any)
 	local properties = envelope.properties or {}
+	local breakDuration = tonumber(properties.timeToFirstBreak)
 	local function participant(value: any): string
 		return if value ~= nil then `Player {tostring(value)}` else "A survivor"
 	end
@@ -34,9 +35,11 @@ function PrototypeRecap:Observe(envelope: any)
 		elseif
 			envelope.name == "draw_used"
 		then `{participant(properties.playerId)} drew The Listener away.`
-		elseif envelope.name == "breath_broken" then `A shelter broke after {math.floor(
-			tonumber(properties.timeToFirstBreak) or 0
-		)} seconds.`
+		elseif
+			envelope.name == "breath_broken"
+			and breakDuration ~= nil
+			and breakDuration > 0
+		then `A shelter broke after {math.floor(breakDuration)} seconds.`
 		elseif
 			envelope.name == "player_escaped"
 		then `{participant(properties.playerId)} escaped the storm.`

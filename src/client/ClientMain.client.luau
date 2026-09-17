@@ -4,6 +4,7 @@ local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SocialService = game:GetService("SocialService")
+local UserInputService = game:GetService("UserInputService")
 
 local Protocol = require(ReplicatedStorage.Hide.Shared.RemoteProtocol)
 local Config = require(ReplicatedStorage.Hide.Shared.Config)
@@ -22,11 +23,13 @@ local phaseDeadline = 0
 local currentState = "Spectating"
 local peekEnabled = false
 local peekCFrame: CFrame? = nil
+local hidingCameraCFrame: CFrame? = nil
 local spectatorIndex = 0
 local activeExtractionId: string? = nil
 local bindContext: (any) -> ()
 local nextRequestId: () -> string
 local onboardingSeen: { [string]: boolean } = {}
+local boundActions: { [string]: boolean } = {}
 
 local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 local hud = Instance.new("ScreenGui")
@@ -164,6 +167,31 @@ toastCorner.CornerRadius = UDim.new(0, 14)
 toastCorner.Parent = toast
 local toastGeneration = 0
 
+local freeformPressure = Instance.new("Frame")
+freeformPressure.Name = "FreeformPressure"
+freeformPressure.Size = UDim2.fromScale(1, 1)
+freeformPressure.BackgroundTransparency = 1
+freeformPressure.Visible = false
+freeformPressure.ZIndex = 2
+freeformPressure.Parent = hud
+local pressureStroke = Instance.new("UIStroke")
+pressureStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+pressureStroke.Thickness = 8
+pressureStroke.Transparency = 0.35
+pressureStroke.Color = Color3.fromRGB(100, 196, 218)
+pressureStroke.Parent = freeformPressure
+local pressureLabel = Instance.new("TextLabel")
+pressureLabel.AnchorPoint = Vector2.new(0.5, 1)
+pressureLabel.Position = UDim2.fromScale(0.5, 0.82)
+pressureLabel.Size = UDim2.new(0.8, 0, 0, 54)
+pressureLabel.BackgroundTransparency = 1
+pressureLabel.Font = Enum.Font.GothamBold
+pressureLabel.TextColor3 = Color3.fromRGB(222, 243, 246)
+pressureLabel.TextSize = 20
+pressureLabel.TextWrapped = true
+pressureLabel.ZIndex = 3
+pressureLabel.Parent = freeformPressure
+
 local resultsPanel = Instance.new("Frame")
 resultsPanel.Name = "ResultsActions"
 resultsPanel.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -267,7 +295,7 @@ local function styleAction(name: string, color: Color3)
 	task.defer(function()
 		local button = ContextActionService:GetButton(name)
 		if button ~= nil then
-			button.Size = UDim2.fromOffset(72, 72)
+			button.Size = UDim2.fromOffset(64, 64)
 			button.BackgroundColor3 = color
 			button.BackgroundTransparency = 0.1
 			local corner = button:FindFirstChildOfClass("UICorner") or Instance.new("UICorner")
@@ -277,13 +305,69 @@ local function styleAction(name: string, color: Color3)
 	end)
 end
 
+local function unbindAction(name: string)
+	if boundActions[name] then
+		ContextActionService:UnbindAction(name)
+		boundActions[name] = nil
+	end
+end
+
+local function bindAction(name: string, callback: any, ...: any)
+	unbindAction(name)
+	ContextActionService:BindAction(name, callback, true, ...)
+	boundActions[name] = true
+end
+
+local function actionPosition(slot: string): UDim2
+	if UserInputService.TouchEnabled then
+		if slot == "primary" then
+			return UDim2.fromScale(0.7, 0.48)
+		elseif slot == "secondary" then
+			return UDim2.fromScale(0.36, 0.48)
+		elseif slot == "left" then
+			return UDim2.fromScale(0.05, 0.4)
+		end
+	end
+	if slot == "primary" then
+		return UDim2.fromScale(0.82, 0.52)
+	elseif slot == "secondary" then
+		return UDim2.fromScale(0.66, 0.68)
+	end
+	return UDim2.fromScale(0.16, 0.48)
+end
+
+local function applyResponsiveLayout()
+	silencePanel.Position = if UserInputService.TouchEnabled
+		then UDim2.fromScale(0.5, 0.62)
+		else UDim2.fromScale(0.5, 0.94)
+end
+
+local function setFreeformPressure(stage: string?)
+	if stage == nil or stage == "Clear" or stage == "Settling" then
+		freeformPressure.Visible = false
+		return
+	end
+	freeformPressure.Visible = true
+	if stage == "Danger" then
+		pressureLabel.Text = "MOVE — THIS SPOT IS EXPOSED"
+		pressureStroke.Color = Color3.fromRGB(230, 116, 72)
+		pressureStroke.Transparency = 0.12
+	else
+		pressureLabel.Text = "THE WIND IS FINDING YOU"
+		pressureStroke.Color = Color3.fromRGB(100, 196, 218)
+		pressureStroke.Transparency = 0.32
+	end
+end
+
+applyResponsiveLayout()
+
 nextRequestId = function(): string
 	requestCounter += 1
 	return `{math.floor(workspace:GetServerTimeNow() * 1000)}-{requestCounter}`
 end
 
 local function unbindContext()
-	ContextActionService:UnbindAction("HidePrimaryAction")
+	unbindAction("HidePrimaryAction")
 	currentContext = nil
 end
 
@@ -300,25 +384,25 @@ local function setPeek(enabled: boolean)
 end
 
 local function unbindPeek()
-	ContextActionService:UnbindAction("HidePeek")
+	unbindAction("HidePeek")
 	peekEnabled = false
 	peekCFrame = nil
 end
 
 local function bindPeek(hidingId: string)
-	ContextActionService:UnbindAction("HidePeek")
+	unbindAction("HidePeek")
 	if entryDecisionActive then
 		return
 	end
-	ContextActionService:BindAction("HidePeek", function(_, inputState)
+	bindAction("HidePeek", function(_, inputState)
 		if inputState == Enum.UserInputState.Begin then
 			setPeek(not peekEnabled)
 			return Enum.ContextActionResult.Sink
 		end
 		return Enum.ContextActionResult.Pass
-	end, true, Enum.KeyCode.V, Enum.KeyCode.ButtonX)
+	end, Enum.KeyCode.V, Enum.KeyCode.ButtonX)
 	ContextActionService:SetTitle("HidePeek", "PEEK")
-	ContextActionService:SetPosition("HidePeek", UDim2.fromScale(0.66, 0.68))
+	ContextActionService:SetPosition("HidePeek", actionPosition("secondary"))
 	styleAction("HidePeek", Color3.fromRGB(47, 103, 128))
 	if currentContext == nil then
 		currentContext = {
@@ -333,8 +417,8 @@ end
 local function clearEntryRequest(restoreHidingActions: boolean?)
 	entryRequestGeneration += 1
 	entryDecisionActive = false
-	ContextActionService:UnbindAction("HideAcceptEntry")
-	ContextActionService:UnbindAction("HideRefuseEntry")
+	unbindAction("HideAcceptEntry")
+	unbindAction("HideRefuseEntry")
 	if restoreHidingActions == true and currentState == "Hiding" and currentContext ~= nil then
 		task.defer(function()
 			bindContext(currentContext)
@@ -346,8 +430,8 @@ end
 local function bindEntryRequest(entryRequest: any)
 	clearEntryRequest(false)
 	entryDecisionActive = true
-	ContextActionService:UnbindAction("HidePrimaryAction")
-	ContextActionService:UnbindAction("HidePeek")
+	unbindAction("HidePrimaryAction")
+	unbindAction("HidePeek")
 	local generation = entryRequestGeneration
 	local function respond(accepted: boolean)
 		actionRequest:FireServer({
@@ -358,26 +442,26 @@ local function bindEntryRequest(entryRequest: any)
 		})
 		clearEntryRequest(true)
 	end
-	ContextActionService:BindAction("HideAcceptEntry", function(_, inputState)
+	bindAction("HideAcceptEntry", function(_, inputState)
 		if inputState == Enum.UserInputState.Begin then
 			respond(true)
 			return Enum.ContextActionResult.Sink
 		end
 		return Enum.ContextActionResult.Pass
-	end, true, Enum.KeyCode.Y, Enum.KeyCode.ButtonA)
+	end, Enum.KeyCode.Y, Enum.KeyCode.ButtonA)
 	ContextActionService:SetTitle("HideAcceptEntry", "LET IN")
-	ContextActionService:SetPosition("HideAcceptEntry", UDim2.fromScale(0.66, 0.5))
+	ContextActionService:SetPosition("HideAcceptEntry", actionPosition("secondary"))
 	styleAction("HideAcceptEntry", Color3.fromRGB(49, 148, 110))
 
-	ContextActionService:BindAction("HideRefuseEntry", function(_, inputState)
+	bindAction("HideRefuseEntry", function(_, inputState)
 		if inputState == Enum.UserInputState.Begin then
 			respond(false)
 			return Enum.ContextActionResult.Sink
 		end
 		return Enum.ContextActionResult.Pass
-	end, true, Enum.KeyCode.N, Enum.KeyCode.ButtonB)
+	end, Enum.KeyCode.N, Enum.KeyCode.ButtonB)
 	ContextActionService:SetTitle("HideRefuseEntry", "REFUSE")
-	ContextActionService:SetPosition("HideRefuseEntry", UDim2.fromScale(0.84, 0.5))
+	ContextActionService:SetPosition("HideRefuseEntry", actionPosition("primary"))
 	styleAction("HideRefuseEntry", Color3.fromRGB(157, 59, 55))
 
 	local remaining = math.max(0, (entryRequest.expiresAt or 0) - workspace:GetServerTimeNow())
@@ -399,7 +483,7 @@ bindContext = function(context: any)
 		return
 	end
 	currentContext = context
-	ContextActionService:BindAction("HidePrimaryAction", function(_, inputState)
+	bindAction("HidePrimaryAction", function(_, inputState)
 		if inputState ~= Enum.UserInputState.Begin or currentContext == nil then
 			return Enum.ContextActionResult.Pass
 		end
@@ -410,19 +494,19 @@ bindContext = function(context: any)
 		payload[currentContext.targetField] = currentContext.targetId
 		actionRequest:FireServer(payload)
 		return Enum.ContextActionResult.Sink
-	end, true, Enum.KeyCode.F, Enum.KeyCode.ButtonB)
+	end, Enum.KeyCode.F, Enum.KeyCode.ButtonB)
 	ContextActionService:SetTitle("HidePrimaryAction", context.label or "ACT")
-	ContextActionService:SetPosition("HidePrimaryAction", UDim2.fromScale(0.82, 0.52))
+	ContextActionService:SetPosition("HidePrimaryAction", actionPosition("primary"))
 	styleAction("HidePrimaryAction", Color3.fromRGB(216, 111, 48))
 end
 
 local function updateDecoyBinding()
-	ContextActionService:UnbindAction("HideUseDecoy")
+	unbindAction("HideUseDecoy")
 	if
 		(currentState == "Active" or currentState == "Rescued")
 		and (currentPhase == "Hunt" or currentPhase == "Relocation" or currentPhase == "Extraction")
 	then
-		ContextActionService:BindAction("HideUseDecoy", function(_, inputState)
+		bindAction("HideUseDecoy", function(_, inputState)
 			if inputState == Enum.UserInputState.Begin then
 				actionRequest:FireServer({
 					action = "UseDraw",
@@ -431,9 +515,9 @@ local function updateDecoyBinding()
 				return Enum.ContextActionResult.Sink
 			end
 			return Enum.ContextActionResult.Pass
-		end, true, Enum.KeyCode.Q, Enum.KeyCode.ButtonL1)
+		end, Enum.KeyCode.Q, Enum.KeyCode.ButtonL1)
 		ContextActionService:SetTitle("HideUseDecoy", "DISTRACT")
-		ContextActionService:SetPosition("HideUseDecoy", UDim2.fromScale(0.16, 0.48))
+		ContextActionService:SetPosition("HideUseDecoy", actionPosition("left"))
 		styleAction("HideUseDecoy", Color3.fromRGB(47, 103, 128))
 	end
 end
@@ -446,6 +530,9 @@ local function updateCamera()
 	if currentState == "Hiding" and peekEnabled and peekCFrame ~= nil then
 		camera.CameraType = Enum.CameraType.Scriptable
 		camera.CFrame = peekCFrame
+	elseif currentState == "Hiding" and hidingCameraCFrame ~= nil then
+		camera.CameraType = Enum.CameraType.Scriptable
+		camera.CFrame = hidingCameraCFrame
 	elseif
 		currentState == "Eliminated"
 		or currentState == "Spectating"
@@ -488,21 +575,21 @@ local function updateCamera()
 end
 
 local function updateSpectatorBinding()
-	ContextActionService:UnbindAction("HideSpectateNext")
+	unbindAction("HideSpectateNext")
 	if
 		currentState == "Eliminated"
 		or currentState == "Spectating"
 		or currentState == "Escaped"
 	then
-		ContextActionService:BindAction("HideSpectateNext", function(_, inputState)
+		bindAction("HideSpectateNext", function(_, inputState)
 			if inputState == Enum.UserInputState.Begin then
 				updateCamera()
 				return Enum.ContextActionResult.Sink
 			end
 			return Enum.ContextActionResult.Pass
-		end, true, Enum.KeyCode.C, Enum.KeyCode.ButtonR1)
+		end, Enum.KeyCode.C, Enum.KeyCode.ButtonR1)
 		ContextActionService:SetTitle("HideSpectateNext", "NEXT")
-		ContextActionService:SetPosition("HideSpectateNext", UDim2.fromScale(0.82, 0.68))
+		ContextActionService:SetPosition("HideSpectateNext", actionPosition("primary"))
 		styleAction("HideSpectateNext", Color3.fromRGB(79, 83, 91))
 	end
 end
@@ -546,6 +633,9 @@ local function applySnapshot(snapshot: any)
 			recordOnboarding("extraction", "GET OUT NOW")
 		end
 		resultsPanel.Visible = currentPhase == "Results"
+		if currentPhase == "Lobby" or currentPhase == "Results" then
+			setFreeformPressure("Clear")
+		end
 		if previousPhase ~= "Results" and currentPhase == "Results" then
 			playAgainButton.Text = "PLAY AGAIN"
 		end
@@ -569,11 +659,24 @@ local function applySnapshot(snapshot: any)
 		end
 		if currentState ~= "Hiding" then
 			silencePanel.Visible = false
+			hidingCameraCFrame = nil
 			unbindPeek()
+		end
+		if currentState ~= "Active" and currentState ~= "Rescued" then
+			setFreeformPressure("Clear")
 		end
 		updateDecoyBinding()
 		updateCamera()
 		updateSpectatorBinding()
+	end
+	if type(snapshot) == "table" and type(snapshot.hidingCamera) == "table" then
+		hidingCameraCFrame = if typeof(snapshot.hidingCamera.cframe) == "CFrame"
+			then snapshot.hidingCamera.cframe
+			else nil
+		updateCamera()
+	end
+	if type(snapshot) == "table" and type(snapshot.freeformPressure) == "table" then
+		setFreeformPressure(tostring(snapshot.freeformPressure.stage or "Clear"))
 	end
 	if type(snapshot) == "table" and type(snapshot.breath) == "table" then
 		local breath = snapshot.breath
@@ -686,7 +789,7 @@ actionResult.OnClientEvent:Connect(function(response)
 		warn(`[HIDE] action refused: {tostring(response.error)}`)
 		showToast(tostring(response.error or "ACTION REFUSED"), 2)
 	elseif type(response.result) == "table" and response.result.status == "Drawn" then
-		ContextActionService:UnbindAction("HideUseDecoy")
+		unbindAction("HideUseDecoy")
 		showToast("IT HEARD YOU — RUN", 2)
 	end
 end)

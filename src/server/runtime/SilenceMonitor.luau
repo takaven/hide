@@ -126,11 +126,12 @@ function SilenceMonitor:Tick(elapsed: number, now: number)
 					sourceId = hidingId,
 					hunterRelevant = true,
 				}, now)
-				self._analytics:Emit(
-					"breath_broken",
-					{ hidingId = hidingId, level = result.level, rate = result.rate },
-					now
-				)
+				self._analytics:Emit("breath_broken", {
+					hidingId = hidingId,
+					level = result.level,
+					rate = result.rate,
+					timeToFirstBreak = result.occupiedDuration,
+				}, now)
 			end
 		end
 	end

@@ -156,12 +156,21 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 	positive(errors, "Draw.Cooldown", field(draw, "Cooldown"))
 	local freeform = field(config, "FreeformPressure")
 	for _, key in ipairs({
+		"CueSeconds",
 		"GraceSeconds",
 		"EvidenceInterval",
 		"EvidenceMagnitude",
 		"MovementThreshold",
 	}) do
 		positive(errors, `FreeformPressure.{key}`, field(freeform, key))
+	end
+	if
+		type(freeform) ~= "table"
+		or type(freeform.CueSeconds) ~= "number"
+		or type(freeform.GraceSeconds) ~= "number"
+		or freeform.CueSeconds >= freeform.GraceSeconds
+	then
+		table.insert(errors, "FreeformPressure.CueSeconds must be below GraceSeconds")
 	end
 	for _, key in ipairs({
 		"TargetParticipants",

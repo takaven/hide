@@ -5,6 +5,7 @@ local Workspace = game:GetService("Workspace")
 
 local HunterBrain = require(script.Parent.Parent.domain.HunterBrain)
 local HunterInspection = require(script.Parent.Parent.domain.HunterInspection)
+local ListenerStopPolicy = require(script.Parent.Parent.domain.ListenerStopPolicy)
 local NearMissPolicy = require(script.Parent.Parent.domain.NearMissPolicy)
 local NativeNavigationProvider = require(script.Parent.NativeNavigationProvider)
 local NavigationProvider = require(script.Parent.NavigationProvider)
@@ -99,7 +100,7 @@ end
 
 function HunterService:_tryStartStop(root: BasePart, now: number): boolean
 	local state = self._brain:GetState()
-	if state == "CHASE" or state == "INVESTIGATE" or now < self._drawCommitUntil then
+	if state == "CHASE" or now < self._drawCommitUntil then
 		return false
 	end
 	local nearby = {}
@@ -107,9 +108,15 @@ function HunterService:_tryStartStop(root: BasePart, now: number): boolean
 		local spot = self._hiding:GetSpot(hidingId)
 		if
 			spot ~= nil
-			and self._hiding:GetOccupancy(hidingId) > 0
-			and (root.Position - spot.approachPosition).Magnitude <= self._config.ListenerStop.RoomRadius
-			and now >= (self._stopCooldowns[hidingId] or 0)
+			and ListenerStopPolicy.canStart({
+				brainState = state,
+				now = now,
+				drawCommitUntil = self._drawCommitUntil,
+				occupancy = self._hiding:GetOccupancy(hidingId),
+				distance = (root.Position - spot.approachPosition).Magnitude,
+				radius = self._config.ListenerStop.RoomRadius,
+				cooldownUntil = self._stopCooldowns[hidingId] or 0,
+			})
 		then
 			table.insert(nearby, hidingId)
 		end
@@ -120,6 +127,8 @@ function HunterService:_tryStartStop(root: BasePart, now: number): boolean
 	if self._navigation ~= nil and self._navigation:GetStatus() ~= "Idle" then
 		self._navigation:Cancel()
 	end
+	root.AssemblyLinearVelocity = Vector3.zero
+	root.AssemblyAngularVelocity = Vector3.zero
 	self._lastTarget = nil
 	self._stopHidingIds = nearby
 	self._stopUntil = now + self._config.ListenerStop.DefaultDuration
@@ -135,6 +144,8 @@ function HunterService:_tryStartStop(root: BasePart, now: number): boolean
 		self._hunter:SetAttribute("Listening", true)
 		local humanoid = self._hunter:FindFirstChildOfClass("Humanoid")
 		if humanoid ~= nil then
+			humanoid:Move(Vector3.zero)
+			humanoid.WalkSpeed = 0
 			humanoid.AutoRotate = false
 		end
 		local targetSpot = self._hiding:GetSpot(nearby[1])

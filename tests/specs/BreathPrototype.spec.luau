@@ -57,11 +57,18 @@ return {
 		Assert.equal(hiding:GetBreath("proof-shelter"), 0)
 
 		local pressure = StationaryPressure.new(Config.FreeformPressure)
-		Assert.equal(pressure:Observe("runner", 0, true, false), nil)
+		local settling = pressure:Observe("runner", 0, true, false)
+		Assert.equal(settling.stage, "Settling")
+		Assert.equal(pressure:Observe("runner", 5.9, true, false), nil)
+		local exposed = pressure:Observe("runner", 6, true, false)
+		Assert.equal(exposed.stage, "Exposed")
 		Assert.equal(pressure:Observe("runner", 11.9, true, false), nil)
 		local evidence = pressure:Observe("runner", 12, true, false)
 		Assert.truthy(evidence ~= nil)
-		Assert.equal(pressure:Observe("runner", 12.1, true, true), nil)
+		Assert.equal(evidence.stage, "Danger")
+		Assert.truthy(evidence.emitEvidence)
+		local cleared = pressure:Observe("runner", 12.1, true, true)
+		Assert.equal(cleared.stage, "Clear")
 
 		local invalid = table.clone(Config)
 		invalid.Breath = table.clone(Config.Breath)
@@ -71,6 +78,10 @@ return {
 		invalidStop.ListenerStop = table.clone(Config.ListenerStop)
 		invalidStop.ListenerStop.BreathMultiplier = 1
 		Assert.falsy(ConfigValidator.validate(invalidStop))
+		local invalidCue = table.clone(Config)
+		invalidCue.FreeformPressure = table.clone(Config.FreeformPressure)
+		invalidCue.FreeformPressure.CueSeconds = invalidCue.FreeformPressure.GraceSeconds
+		Assert.falsy(ConfigValidator.validate(invalidCue))
 
 		for _, action in ipairs({ "SetBreath", "SetSafe", "ForceStop", "BypassBreak" }) do
 			local valid = ActionValidator.validate({

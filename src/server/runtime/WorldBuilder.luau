@@ -245,14 +245,36 @@ local function addHiding(
 	)
 	approach.Transparency = 1
 	approach.CanCollide = false
+	local outward =
+		Vector3.new(approach.Position.X - position.X, 0, approach.Position.Z - position.Z).Unit
+	local exit = part(
+		model,
+		"ExitPoint",
+		Vector3.new(1, 1, 1),
+		approach.Position + anchor.CFrame.RightVector * 7 + outward * 1.5,
+		Color3.new(1, 0.6, 0)
+	)
+	exit.CFrame = CFrame.lookAt(exit.Position, exit.Position + outward * 10)
+	exit.Transparency = 1
+	exit.CanCollide = false
+	local hidingCamera = part(
+		model,
+		"HidingCamera",
+		Vector3.new(1, 1, 1),
+		approach.Position + Vector3.new(0, 3.2, 0) - outward * 1.2,
+		Color3.new(0.4, 0.8, 1)
+	)
+	hidingCamera.CFrame = CFrame.lookAt(hidingCamera.Position, hidingCamera.Position + outward * 10)
+	hidingCamera.Transparency = 1
+	hidingCamera.CanCollide = false
 	local peek = part(
 		model,
 		"PeekPoint",
 		Vector3.new(1, 1, 1),
-		position + Vector3.new(0, 4.7, 0) + anchor.CFrame.LookVector * 2.2,
+		approach.Position + Vector3.new(0, 3.2, 0) + outward * 0.5,
 		Color3.new(0, 1, 1)
 	)
-	peek.CFrame = CFrame.lookAt(peek.Position, peek.Position + anchor.CFrame.LookVector * 12)
+	peek.CFrame = CFrame.lookAt(peek.Position, peek.Position + outward * 12)
 	peek.Transparency = 1
 	peek.CanCollide = false
 	CollectionService:AddTag(model, "HideHidingSpot")

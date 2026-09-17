@@ -126,6 +126,7 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 			}, now)
 			self.Remotes.StateSnapshot:FireClient(player, {
 				state = "Hiding",
+				hidingCamera = { cframe = self.WorldRegistry.Hiding[spot.id].hidingCameraCFrame },
 				contextAction = {
 					action = "VolunteerOut",
 					targetField = "hidingId",
@@ -248,6 +249,9 @@ function ActionService:Handle(player: Player, payload: any, now: number): (any?,
 			}, now)
 			self.Remotes.StateSnapshot:FireClient(requester, {
 				state = "Hiding",
+				hidingCamera = {
+					cframe = self.WorldRegistry.Hiding[spot.id].hidingCameraCFrame,
+				},
 				contextAction = {
 					action = "VolunteerOut",
 					targetField = "hidingId",

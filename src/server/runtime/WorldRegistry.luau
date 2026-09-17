@@ -54,10 +54,10 @@ local function resolveExtractionPosition(instance: Instance, fallback: Vector3):
 	return fallback
 end
 
-local function resolvePeekCFrame(instance: Instance): CFrame?
-	local peek = instance:FindFirstChild("PeekPoint", true)
-	if peek ~= nil and peek:IsA("BasePart") then
-		return peek.CFrame
+local function resolvePointCFrame(instance: Instance, name: string): CFrame?
+	local point = instance:FindFirstChild(name, true)
+	if point ~= nil and point:IsA("BasePart") then
+		return point.CFrame
 	end
 	return nil
 end
@@ -97,7 +97,8 @@ function WorldRegistry:Scan(): { string }
 				instance = instance,
 				position = position,
 				approachPosition = resolveApproachPosition(instance, position),
-				peekCFrame = resolvePeekCFrame(instance),
+				hidingCameraCFrame = resolvePointCFrame(instance, "HidingCamera"),
+				peekCFrame = resolvePointCFrame(instance, "PeekPoint"),
 				capacity = capacity,
 			}
 		end

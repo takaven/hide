@@ -39,7 +39,7 @@ local SAFE_SOUNDS: { [string]: SoundDefinition } = {
 		speed = 1.15,
 	},
 	HidingRustle = {
-		id = "rbxasset://sounds/swoosh.wav",
+		id = "rbxasset://sounds/switch.wav",
 		volume = 0.28,
 		looped = false,
 		speed = 0.72,

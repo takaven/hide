@@ -6,18 +6,30 @@ local StationaryPressure = require(script.Parent.Parent.domain.StationaryPressur
 local StationaryExposureService = {}
 StationaryExposureService.__index = StationaryExposureService
 
-function StationaryExposureService.new(config: any, playerStates: any, noise: any, analytics: any)
+function StationaryExposureService.new(
+	config: any,
+	playerStates: any,
+	noise: any,
+	analytics: any,
+	remotes: any
+)
 	return setmetatable({
 		_config = config,
 		_playerStates = playerStates,
 		_noise = noise,
 		_analytics = analytics,
+		_remotes = remotes,
 		_pressure = StationaryPressure.new(config.FreeformPressure),
 	}, StationaryExposureService)
 end
 
 function StationaryExposureService:ResetRound()
 	self._pressure:ResetRound()
+	for _, player in ipairs(Players:GetPlayers()) do
+		self._remotes.StateSnapshot:FireClient(player, {
+			freeformPressure = { stage = "Clear", duration = 0 },
+		})
+	end
 end
 
 function StationaryExposureService:Tick(now: number)
@@ -39,17 +51,27 @@ function StationaryExposureService:Tick(now: number)
 				horizontal >= self._config.FreeformPressure.MovementThreshold
 			)
 			if pressure ~= nil then
-				self._noise:Add({
-					origin = root.Position,
-					magnitude = pressure.magnitude,
-					category = "Environment",
-					sourcePlayerId = playerId,
-					sourceId = `storm-exposure-{playerId}`,
-					hunterRelevant = true,
-				}, now)
+				self._remotes.StateSnapshot:FireClient(player, {
+					freeformPressure = {
+						stage = pressure.stage,
+						duration = pressure.duration,
+					},
+				})
+				if pressure.emitEvidence then
+					self._noise:Add({
+						origin = root.Position,
+						magnitude = pressure.magnitude,
+						category = "Environment",
+						sourcePlayerId = playerId,
+						sourceId = `storm-exposure-{playerId}`,
+						hunterRelevant = true,
+					}, now)
+				end
 				self._analytics:Emit("freeform_stationary_pressure", {
 					playerId = playerId,
 					duration = pressure.duration,
+					stage = pressure.stage,
+					evidenceEmitted = pressure.emitEvidence,
 				}, now)
 			end
 		end

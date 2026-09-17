@@ -165,6 +165,7 @@ remotes.GetStateSnapshot.OnServerInvoke = function(player: Player)
 	if state == "Hiding" then
 		local hidingId = hiding:GetPlayerSpot(playerId)
 		if hidingId ~= nil then
+			local record = world.Hiding[hidingId]
 			snapshot.contextAction = {
 				action = "VolunteerOut",
 				targetField = "hidingId",
@@ -172,6 +173,9 @@ remotes.GetStateSnapshot.OnServerInvoke = function(player: Player)
 				label = "VOLUNTEER OUT",
 			}
 			snapshot.peekAction = { hidingId = hidingId }
+			if record ~= nil then
+				snapshot.hidingCamera = { cframe = record.hidingCameraCFrame }
+			end
 		end
 	end
 	return snapshot
@@ -208,7 +212,8 @@ local gateway = RemoteGateway.new(Config, remotes, actionService)
 local interactions = InteractionBinder.new(Config, world, gateway)
 local silence = SilenceMonitor.new(Config, hiding, noise, analytics, remotes)
 local movementNoise = MovementNoiseService.new(Config, playerStates, noise, analytics)
-local stationaryExposure = StationaryExposureService.new(Config, playerStates, noise, analytics)
+local stationaryExposure =
+	StationaryExposureService.new(Config, playerStates, noise, analytics, remotes)
 local downedEvidence = DownedEvidenceService.new(Config, playerStates, noise)
 local statePresentation = PlayerStatePresentationService.new(playerStates, worldRoot)
 local doorPresentation =
