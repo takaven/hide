@@ -1,5 +1,7 @@
 --!strict
 
+local RunService = game:GetService("RunService")
+
 local PowerObjectiveService = {}
 PowerObjectiveService.__index = PowerObjectiveService
 
@@ -103,6 +105,35 @@ function PowerObjectiveService:_complete(player: Player, panel: BasePart)
 		self._audio:Play("FuseReset", panel)
 	end
 	self:_broadcast("Emergency", playerId)
+end
+
+function PowerObjectiveService:StudioBeginBlackout(): boolean
+	if not RunService:IsStudio() or workspace:GetAttribute("EnableQACaptureRunner") ~= true then
+		return false
+	end
+	if not self._objective:BeginBlackout() then
+		return false
+	end
+	setLights(self._root, "Blackout")
+	if self._prompt ~= nil then
+		self._prompt.Enabled = true
+	end
+	if self._audio ~= nil then
+		self._audio:Play("Blackout", self._panel)
+	end
+	self:_broadcast("Blackout", nil)
+	return true
+end
+
+function PowerObjectiveService:StudioCompleteFuse(player: Player): boolean
+	if not RunService:IsStudio() or workspace:GetAttribute("EnableQACaptureRunner") ~= true then
+		return false
+	end
+	if self._panel == nil then
+		return false
+	end
+	self:_complete(player, self._panel)
+	return self._objective:GetState() == "Emergency"
 end
 
 function PowerObjectiveService:Tick(now: number)

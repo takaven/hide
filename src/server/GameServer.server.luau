@@ -52,6 +52,7 @@ local SoakMetricsService = require(Runtime.SoakMetricsService)
 local StormPresentationService = require(Runtime.StormPresentationService)
 local StationaryExposureService = require(Runtime.StationaryExposureService)
 local StudioTestOverrides = require(Runtime.StudioTestOverrides)
+local StudioCaptureRunnerService = require(Runtime.StudioCaptureRunnerService)
 local WorldRegistry = require(Runtime.WorldRegistry)
 local WorldBuilder = require(Runtime.WorldBuilder)
 local ListenerPresentationService = require(Runtime.ListenerPresentationService)
@@ -242,6 +243,18 @@ local listenerPresentation = if listenerModel and listenerModel:IsA("Model")
 	then ListenerPresentationService.new(listenerModel)
 	else nil
 actionService.Hunter = hunter
+local studioCaptureRunner = StudioCaptureRunnerService.new({
+	Config = Config,
+	WorldRoot = worldRoot,
+	World = world,
+	PlayerStates = playerStates,
+	Hiding = hiding,
+	Presentation = presentation,
+	Hunter = hunter,
+	Power = power,
+	Audio = audio,
+	Remotes = remotes,
+})
 local movieMoments = MovieMomentDirector.new({
 	Config = Config,
 	WorldRoot = worldRoot,
@@ -387,6 +400,7 @@ gateway:Start()
 interactions:BindAll()
 round:Start()
 local hunterActive = hunter:Start()
+studioCaptureRunner:Start()
 if not hunterActive then
 	warn("[HIDE] The Listener is inactive until Phase 2 supplies one tagged hunter model")
 end

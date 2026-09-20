@@ -59,6 +59,12 @@ Record one uninterrupted comparison route with the ordinary gameplay camera and 
 
 Capture the same route at desktop/standard phone, Galaxy A06 emulation, and tablet. The acceptance gate is visual: shelter exits, Listener, Breath, fuse, and blackout navigation must remain readable, while blackout must still be an unmistakable contrast event.
 
+### One-key Studio QA runner
+
+Build and open `capture.project.json`, then start a normal solo Play session. The dedicated capture place enables `EnableQACaptureRunner`; default and staging projects do not. When **READY TO RECORD — PRESS F8 TO START** appears, begin OBS recording and press F8 once. The runner waits three seconds, then drives the establishing view, lobby, shelter corridor, real occupied-shelter Listener Stop, visible Breath pressure, pool/exterior, real blackout, automatic fuse completion through the production completion handler, and a real visual-acquisition chase. It restores the player and shows **CAPTURE COMPLETE** after approximately 53 seconds.
+
+The runner disables Roblox CoreGui during the take but keeps `HideHUD` and all real player-facing gameplay presentation active. It does not start or save a native Roblox recording. OBS remains founder-controlled, and Studio dock widgets such as BloxForge must be outside the captured game source or closed before recording. Capture controls are created only when both `RunService:IsStudio()` and the capture-project attribute are true.
+
 On the current validation host the native recorder started successfully and saved a genuine 29.112-second, 1936×1088 runtime MP4 after the founder clicked **Save** and **Allow**. File integrity and metadata passed, but visual QA rejected the clip because the 3D viewport rendered blank white while CoreGui and the repository's cue overlays remained visible. The file is preserved as capture-pipeline evidence, not as shareable marketing footage. Roblox's recorder also ignored the portrait device simulation and encoded landscape. A clean Studio restart plus one OBS Record/Stop pair is the reliable remaining capture path; use the prepared sequence above and reject any take with a blank viewport or developer UI.
 
 ## Local tooling limitation
