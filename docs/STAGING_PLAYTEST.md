@@ -47,6 +47,18 @@ For the native 29-second trailer, open a clean play client, enable the repositor
 
 Roblox's native recorder cannot produce the required uninterrupted 60–90-second clip. For raw gameplay, start OBS display/game capture at 1920×1080 and 30 or 60 fps, press Record once, run one uninterrupted prepared round containing movement, hiding, Shared Silence/heat, cooperation, Listener pressure, and extraction, then press Stop. Export H.264 MP4 with game audio only. No commercial music or external animation is permitted.
 
+### Visual-remediation OBS route
+
+Record one uninterrupted comparison route with the ordinary gameplay camera and HUD:
+
+1. Begin in the normal lobby. Hold on the reception feature wall, warm practicals, Le Morne signage, and exterior storm view.
+2. Walk through the primary guest shelter corridor. Show suite wayfinding, exits, Breath placement, and warm/cool separation.
+3. Trigger or stage The Stop in the Listener encounter space. Keep both shelter context and Listener silhouette visible without a spotlight.
+4. Cross the pool/exterior route. Frame wet ground, pool response, flags or planting, and the cool storm background against a warm resort edge light.
+5. Enter blackout and continue to the fuse. Show main practicals switching off, emergency/navigation lights remaining, readable movement to the fuse, and intermittent lightning if it occurs.
+
+Capture the same route at desktop/standard phone, Galaxy A06 emulation, and tablet. The acceptance gate is visual: shelter exits, Listener, Breath, fuse, and blackout navigation must remain readable, while blackout must still be an unmistakable contrast event.
+
 On the current validation host the native recorder started successfully and saved a genuine 29.112-second, 1936×1088 runtime MP4 after the founder clicked **Save** and **Allow**. File integrity and metadata passed, but visual QA rejected the clip because the 3D viewport rendered blank white while CoreGui and the repository's cue overlays remained visible. The file is preserved as capture-pipeline evidence, not as shareable marketing footage. Roblox's recorder also ignored the portrait device simulation and encoded landscape. A clean Studio restart plus one OBS Record/Stop pair is the reliable remaining capture path; use the prepared sequence above and reject any take with a blank viewport or developer UI.
 
 ## Local tooling limitation

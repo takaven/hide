@@ -9,14 +9,14 @@ local WorldBuilder = {}
 local ROOT_NAME = "LeMorneStormResort"
 
 local palette = {
-	stone = Color3.fromRGB(54, 58, 56),
-	stoneLight = Color3.fromRGB(105, 103, 92),
-	timber = Color3.fromRGB(91, 61, 42),
-	cream = Color3.fromRGB(218, 207, 181),
+	stone = Color3.fromRGB(65, 67, 62),
+	stoneLight = Color3.fromRGB(126, 120, 103),
+	timber = Color3.fromRGB(108, 69, 43),
+	cream = Color3.fromRGB(229, 215, 184),
 	teal = Color3.fromRGB(26, 88, 88),
-	emergency = Color3.fromRGB(240, 83, 52),
-	vegetation = Color3.fromRGB(35, 82, 48),
-	ocean = Color3.fromRGB(20, 55, 72),
+	emergency = Color3.fromRGB(220, 126, 54),
+	vegetation = Color3.fromRGB(42, 94, 54),
+	ocean = Color3.fromRGB(30, 73, 91),
 }
 
 local function part(
@@ -91,7 +91,8 @@ local function addLight(
 	position: Vector3,
 	color: Color3,
 	range: number,
-	emergency: boolean?
+	emergency: boolean?,
+	brightness: number?
 )
 	local fixture = part(
 		parent,
@@ -102,12 +103,14 @@ local function addLight(
 		Enum.Material.Neon
 	)
 	fixture.CanCollide = false
+	fixture:SetAttribute("LightingRole", if emergency then "Emergency" else "Main")
 	local light = Instance.new("PointLight")
 	light.Color = color
-	light.Brightness = 1.5
+	light.Brightness = brightness or (if emergency then 1.1 else 2.1)
 	light.Range = range
 	light.Shadows = true
 	light.Parent = fixture
+	return fixture
 end
 
 local function addRoom(
@@ -456,7 +459,7 @@ local function addListener(parent: Instance, position: Vector3)
 		"Torso",
 		Vector3.new(3.1, 5.8, 1.65),
 		position + Vector3.new(0, 5.8, 0),
-		Color3.fromRGB(18, 24, 26),
+		Color3.fromRGB(27, 34, 35),
 		Enum.Material.Fabric
 	)
 	body.Anchored = false
@@ -474,7 +477,7 @@ local function addListener(parent: Instance, position: Vector3)
 	head.CanCollide = false
 	joint(root, "ListenerRoot", root, body, CFrame.new(0, 2.8, 0))
 	joint(body, "ListenerNeck", body, head, CFrame.new(0, 3.25, -0.1), CFrame.new(0, -1.3, 0))
-	local limbColor = Color3.fromRGB(25, 31, 31)
+	local limbColor = Color3.fromRGB(36, 44, 44)
 	local leftArm = part(
 		model,
 		"LeftArm",
@@ -556,7 +559,7 @@ local function addListener(parent: Instance, position: Vector3)
 			"ListeningFin",
 			Vector3.new(0.28, 3.8, 1.9),
 			position + Vector3.new(side * 1.45, 10.1, 0),
-			Color3.fromRGB(62, 86, 82),
+			Color3.fromRGB(83, 112, 105),
 			Enum.Material.CorrodedMetal
 		)
 		ear.Anchored = false
@@ -565,6 +568,24 @@ local function addListener(parent: Instance, position: Vector3)
 		weld.Part0 = head
 		weld.Part1 = ear
 		weld.Parent = ear
+	end
+	-- Small metallic contours catch nearby practicals and lightning without turning the threat
+	-- into a self-lit target.
+	for side = -1, 1, 2 do
+		local shoulder = part(
+			model,
+			"ListenerShoulderRim",
+			Vector3.new(0.2, 1.9, 1.72),
+			body.Position + Vector3.new(side * 1.6, 1.6, 0),
+			Color3.fromRGB(75, 92, 89),
+			Enum.Material.CorrodedMetal
+		)
+		shoulder.Anchored = false
+		shoulder.CanCollide = false
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = body
+		weld.Part1 = shoulder
+		weld.Parent = shoulder
 	end
 	local humanoid = Instance.new("Humanoid")
 	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
@@ -614,6 +635,18 @@ local function addHeroArt(parent: Model)
 			Enum.Material.WoodPlanks
 		)
 	end
+	local receptionFeature = part(
+		details,
+		"ReceptionFeatureWall",
+		Vector3.new(18, 7, 0.35),
+		Vector3.new(-7, 5.5, 30.15),
+		Color3.fromRGB(38, 99, 94),
+		Enum.Material.Slate
+	)
+	label(receptionFeature, "RAVINALA NOIR  •  LE MORNE", Enum.NormalId.Back)
+	addLight(details, Vector3.new(-14, 9.4, 39), Color3.fromRGB(255, 194, 119), 23, false, 2.7)
+	addLight(details, Vector3.new(14, 9.4, 39), Color3.fromRGB(255, 194, 119), 23, false, 2.7)
+	addLight(details, Vector3.new(-7, 8.8, 31.2), Color3.fromRGB(255, 178, 91), 15, false, 2.3)
 	-- Guest shelter wing: door reveals, wall lights, linen carts and room numbering.
 	for index, z in ipairs({ -8, 0, 8, 16 }) do
 		local plaque = part(
@@ -626,6 +659,17 @@ local function addHeroArt(parent: Model)
 		)
 		label(plaque, `CH {100 + index}  •  ROOM`, Enum.NormalId.Right)
 		addLight(details, Vector3.new(-82.7, 8.8, z), Color3.fromRGB(233, 188, 116), 11, false)
+	end
+	for _, z in ipairs({ -12, 20 }) do
+		part(
+			details,
+			"GuestWingDadoTrim",
+			Vector3.new(0.24, 0.4, 25),
+			Vector3.new(-83.9, 3.2, z),
+			Color3.fromRGB(173, 128, 65),
+			Enum.Material.Metal
+		).CanCollide =
+			false
 	end
 	part(
 		details,
@@ -657,6 +701,8 @@ local function addHeroArt(parent: Model)
 		Enum.Material.Metal
 	)
 	label(serviceSign, "GÉNÉRATEUR  ↓  •  SORTI  ↑", Enum.NormalId.Front)
+	addLight(details, Vector3.new(0, 9.5, -28), Color3.fromRGB(242, 177, 99), 20, false, 2.2)
+	addLight(details, Vector3.new(0, 8.7, -45), Color3.fromRGB(231, 151, 70), 17, false, 2)
 	-- Generator hero objective.
 	local cabinet = part(
 		details,
@@ -676,6 +722,8 @@ local function addHeroArt(parent: Model)
 	)
 	panel:SetAttribute("ObjectiveId", "generator-fuse")
 	label(panel, "FUSE  •  415V", Enum.NormalId.Front)
+	addLight(details, Vector3.new(0, 8.8, -67), Color3.fromRGB(237, 171, 75), 18, false, 2.4)
+	addLight(details, Vector3.new(0, 7.4, -69.8), Color3.fromRGB(142, 190, 126), 11, true, 1.25)
 	for index = -1, 1 do
 		local cable = part(
 			details,
@@ -697,6 +745,7 @@ local function addHeroArt(parent: Model)
 		Enum.Material.Glass
 	)
 	pool.Transparency = 0.28
+	pool.Reflectance = 0.12
 	part(
 		details,
 		"PoolCoping",
@@ -737,8 +786,12 @@ local function addHeroArt(parent: Model)
 			Enum.Material.Glass
 		)
 		puddle.Transparency = 0.48
+		puddle.Reflectance = 0.16
 		puddle.CanCollide = false
 	end
+	addLight(details, Vector3.new(56, 8, 42), Color3.fromRGB(126, 169, 191), 30, false, 1.35)
+	addLight(details, Vector3.new(22, 7.5, 63), Color3.fromRGB(255, 174, 87), 20, false, 1.75)
+	addLight(details, Vector3.new(0, 7, 62), Color3.fromRGB(222, 142, 58), 18, true, 1.15)
 	-- One readable duck-through shortcut; geometry stays open and never becomes a trap.
 	local hatch = part(
 		details,
@@ -752,29 +805,41 @@ local function addHeroArt(parent: Model)
 end
 
 local function configureLighting()
-	Lighting.ClockTime = 17.72
-	Lighting.Brightness = 2.05
-	Lighting.Ambient = Color3.fromRGB(70, 82, 86)
-	Lighting.OutdoorAmbient = Color3.fromRGB(80, 92, 96)
-	Lighting.EnvironmentDiffuseScale = 0.35
-	Lighting.EnvironmentSpecularScale = 0.45
+	Lighting.ClockTime = 17.45
+	Lighting.Brightness = 2.8
+	Lighting.Ambient = Color3.fromRGB(104, 98, 86)
+	Lighting.OutdoorAmbient = Color3.fromRGB(91, 111, 123)
+	Lighting.EnvironmentDiffuseScale = 0.55
+	Lighting.EnvironmentSpecularScale = 0.72
 	Lighting.GlobalShadows = true
-	Lighting.ExposureCompensation = 0.08
+	Lighting.ExposureCompensation = 0.35
 	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
 	atmosphere.Name = "CycloneAtmosphere"
-	atmosphere.Color = Color3.fromRGB(134, 158, 166)
-	atmosphere.Decay = Color3.fromRGB(48, 62, 68)
-	atmosphere.Density = 0.42
-	atmosphere.Haze = 2.2
-	atmosphere.Glare = 0.05
+	atmosphere.Color = Color3.fromRGB(167, 184, 188)
+	atmosphere.Decay = Color3.fromRGB(70, 82, 86)
+	atmosphere.Density = 0.28
+	atmosphere.Haze = 1.35
+	atmosphere.Glare = 0.03
 	atmosphere.Parent = Lighting
 	local correction = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
 		or Instance.new("ColorCorrectionEffect")
 	correction.Name = "StormGrade"
-	correction.TintColor = Color3.fromRGB(181, 204, 204)
-	correction.Contrast = 0.12
-	correction.Saturation = -0.18
+	correction.TintColor = Color3.fromRGB(235, 233, 221)
+	correction.Brightness = 0.03
+	correction.Contrast = 0.04
+	correction.Saturation = 0.02
 	correction.Parent = Lighting
+	local bloom = Lighting:FindFirstChildOfClass("BloomEffect") or Instance.new("BloomEffect")
+	bloom.Name = "PracticalBloom"
+	bloom.Intensity = 0.18
+	bloom.Size = 18
+	bloom.Threshold = 1.35
+	bloom.Parent = Lighting
+	local depthOfField = Lighting:FindFirstChildOfClass("DepthOfFieldEffect")
+		or Instance.new("DepthOfFieldEffect")
+	depthOfField.Name = "GameplayDepthOfField"
+	depthOfField.Enabled = false
+	depthOfField.Parent = Lighting
 end
 
 function WorldBuilder.Build(): Model
@@ -789,7 +854,7 @@ function WorldBuilder.Build(): Model
 	root:SetAttribute("MapId", "mauritius-le-morne-storm-resort")
 	root.Parent = Workspace
 
-	part(
+	local wetResortGround = part(
 		root,
 		"ResortGround",
 		Vector3.new(210, 2, 160),
@@ -864,6 +929,7 @@ function WorldBuilder.Build(): Model
 		palette.cream,
 		Enum.Material.Limestone
 	)
+	wetResortGround.Reflectance = 0.07
 	-- Corridor walls turn the central spine into chase geometry instead of an open plaza.
 	for _, spec in ipairs({
 		{ Vector3.new(-13.5, 6, 10), Vector3.new(1, 12, 30) },
@@ -1137,7 +1203,7 @@ function WorldBuilder.Build(): Model
 		Vector3.new(0, 10, -36),
 		Vector3.new(0, 10, -58),
 	}) do
-		addLight(root, position, palette.emergency, 25, true)
+		addLight(root, position, palette.emergency, 25, true, 1.05)
 	end
 	for _, position in ipairs({
 		Vector3.new(0, 9, 46),
@@ -1147,7 +1213,7 @@ function WorldBuilder.Build(): Model
 		Vector3.new(-48, 9, -35),
 		Vector3.new(0, 9, -61),
 	}) do
-		addLight(root, position, Color3.fromRGB(190, 210, 201), 32, false)
+		addLight(root, position, Color3.fromRGB(255, 199, 127), 32, false, 2.25)
 	end
 	addListener(root, Vector3.new(0, 2, -57))
 	addHeroArt(root)

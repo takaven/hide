@@ -8,9 +8,18 @@ local function setLights(root: Model, state: string)
 	for _, descendant in ipairs(root:GetDescendants()) do
 		if descendant:IsA("Light") then
 			local emergency = descendant.Parent ~= nil
-				and string.find(descendant.Parent.Name, "Emergency") ~= nil
-			descendant.Enabled = state == "Stable" or (state == "Emergency" and emergency)
-			descendant.Brightness = if state == "Emergency" and emergency then 2.4 else 1.5
+				and (
+					descendant.Parent:GetAttribute("LightingRole") == "Emergency"
+					or string.find(descendant.Parent.Name, "Emergency") ~= nil
+				)
+			-- Blackout removes the resort's main practicals, but leaves a restrained
+			-- navigation layer so it reads as an event rather than an unreadable screen.
+			descendant.Enabled = state == "Stable" or emergency
+			if emergency then
+				descendant.Brightness = if state == "Blackout" then 0.72 else 1.25
+			else
+				descendant.Brightness = 2.15
+			end
 		elseif descendant:IsA("BasePart") and descendant.Name == "HouseLight" then
 			descendant.Transparency = if state == "Stable" then 0 else 0.82
 		elseif descendant:IsA("BasePart") and descendant.Name == "EmergencyLight" then
