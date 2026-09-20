@@ -14,6 +14,12 @@ local specs = {
 	require("./specs/RescueLifecycle.spec"),
 	require("./specs/HunterInvestigation.spec"),
 	require("./specs/LifecycleAndAtomicity.spec"),
+	require("./specs/PlayableRemediation.spec"),
+	require("./specs/StagingGate.spec"),
+	require("./specs/LaunchReadiness.spec"),
+	require("./specs/BreathPrototype.spec"),
+	require("./specs/RuntimeRemediation.spec"),
+	require("./specs/VerticalSlice.spec"),
 }
 
 local passed = 0

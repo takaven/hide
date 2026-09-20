@@ -53,7 +53,7 @@ function RemoteGateway:Submit(player: Player, payload: any)
 			nil,
 			validationError
 		)
-		return
+		return nil, validationError
 	end
 
 	local now = workspace:GetServerTimeNow()
@@ -61,12 +61,12 @@ function RemoteGateway:Submit(player: Player, payload: any)
 	local allowed, rateError = self._rateLimiter:Allow(playerId, payload.action, now)
 	if not allowed then
 		self:_respond(player, payload.requestId, false, nil, rateError)
-		return
+		return nil, rateError
 	end
 	local fresh, replayError = self._replayGuard:Accept(playerId, payload.requestId, now)
 	if not fresh then
 		self:_respond(player, payload.requestId, false, nil, replayError)
-		return
+		return nil, replayError
 	end
 
 	local called, result, actionError =
@@ -74,10 +74,13 @@ function RemoteGateway:Submit(player: Player, payload: any)
 	if not called then
 		warn(`[HIDE] action handler failed for {payload.action}`)
 		self:_respond(player, payload.requestId, false, nil, "server action failed")
+		return nil, "server action failed"
 	elseif result == nil then
 		self:_respond(player, payload.requestId, false, nil, actionError)
+		return nil, actionError
 	else
 		self:_respond(player, payload.requestId, true, result, nil)
+		return result, nil
 	end
 end
 

@@ -1,0 +1,46 @@
+{
+  "name": "HIDE Visual QA Capture",
+  "serveAddress": "127.0.0.1",
+  "tree": {
+    "$className": "DataModel",
+    "Lighting": {
+      "$className": "Lighting",
+      "$properties": {
+        "LightingStyle": "Soft"
+      }
+    },
+    "Workspace": {
+      "$className": "Workspace",
+      "$attributes": {
+        "EnableQACaptureRunner": true,
+        "HideEnvironment": "Development",
+        "HideHumanOnlyTest": true,
+        "HideBuildVersion": "visual-qa-8b88e6e"
+      }
+    },
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Hide": {
+        "$className": "Folder",
+        "Shared": {
+          "$path": "src/shared"
+        }
+      }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "Hide": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "HideClient": {
+          "$path": "src/client"
+        }
+      }
+    }
+  }
+}

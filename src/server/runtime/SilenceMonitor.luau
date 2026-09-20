@@ -1,21 +1,31 @@
 --!strict
 
 local Players = game:GetService("Players")
+local SuspicionTier = require(game:GetService("ReplicatedStorage").Hide.Shared.SuspicionTier)
+local SuspicionSnapshotPolicy = require(script.Parent.Parent.domain.SuspicionSnapshotPolicy)
 
 local SilenceMonitor = {}
 SilenceMonitor.__index = SilenceMonitor
 
-function SilenceMonitor.new(hiding: any, noise: any, analytics: any)
+function SilenceMonitor.new(config: any, hiding: any, noise: any, analytics: any, remotes: any?)
 	return setmetatable({
+		_config = config,
 		_hiding = hiding,
 		_noise = noise,
 		_analytics = analytics,
 		_lastStates = {},
+		_lastRisk = {},
+		_lastSuspicionTiers = {},
+		_lastStopActive = {},
+		_remotes = remotes,
 	}, SilenceMonitor)
 end
 
 function SilenceMonitor:ResetRound()
 	self._lastStates = {}
+	self._lastRisk = {}
+	self._lastSuspicionTiers = {}
+	self._lastStopActive = {}
 end
 
 function SilenceMonitor:_movementFactor(hidingId: string): number
@@ -33,23 +43,80 @@ function SilenceMonitor:_movementFactor(hidingId: string): number
 end
 
 function SilenceMonitor:Tick(elapsed: number, now: number)
+	for _, request in ipairs(self._hiding:PruneExpired(now)) do
+		self._analytics:Emit("entry_request_expired", {
+			playerId = request.playerId,
+			hidingId = request.hidingId,
+		}, now)
+	end
 	for _, hidingId in ipairs(self._hiding:GetSpotIds()) do
 		local spot = self._hiding:GetSpot(hidingId)
 		local result = self._hiding:Tick(hidingId, elapsed, now, self:_movementFactor(hidingId))
 		if spot ~= nil and result ~= nil then
 			local previous = self._lastStates[hidingId]
+			local previousRisk = self._lastRisk[hidingId]
+			local heat = self._hiding:GetHeat(hidingId, now)
+			local exposed = self._hiding:IsExposed(hidingId, now)
+			local suspicionTier = SuspicionTier.fromValues(self._config, heat, exposed)
+			local previousSuspicionTier = self._lastSuspicionTiers[hidingId]
+			local previousStopActive = self._lastStopActive[hidingId]
 			self._lastStates[hidingId] = result.state
+			self._lastRisk[hidingId] = result.risk
+			self._lastSuspicionTiers[hidingId] = suspicionTier
+			self._lastStopActive[hidingId] = result.stopActive
 			if
-				(result.state == "Warning" or result.state == "Unstable")
+				self._remotes ~= nil
+				and (
+					previousStopActive ~= result.stopActive
+					or SuspicionSnapshotPolicy.shouldEmit(
+						previous,
+						result.state,
+						previousRisk,
+						result.risk,
+						previousSuspicionTier,
+						suspicionTier
+					)
+				)
+			then
+				for _, occupantId in ipairs(self._hiding:GetOccupants(hidingId)) do
+					local userId = tonumber(occupantId)
+					local occupant = if userId then Players:GetPlayerByUserId(userId) else nil
+					if occupant ~= nil then
+						self._remotes.StateSnapshot:FireClient(occupant, {
+							breath = {
+								state = result.state,
+								level = result.level,
+								rate = result.rate,
+								occupancy = self._hiding:GetOccupancy(hidingId),
+								capacity = spot.capacity,
+								stopActive = result.stopActive,
+								stopRemaining = result.stopRemaining,
+							},
+						})
+					end
+				end
+				self._analytics:Emit("breath_sample", {
+					hidingId = hidingId,
+					level = result.level,
+					rate = result.rate,
+					occupancy = self._hiding:GetOccupancy(hidingId),
+					stopActive = result.stopActive,
+					stopRemaining = result.stopRemaining,
+				}, now)
+			end
+			if
+				(result.state == "Warning" or result.state == "Critical")
 				and previous ~= "Warning"
-				and previous ~= "Unstable"
+				and previous ~= "Critical"
 				and previous ~= "Broken"
 			then
-				self._analytics:Emit(
-					"silence_warning",
-					{ hidingId = hidingId, risk = result.risk },
-					now
-				)
+				self._analytics:Emit("breath_warning", {
+					hidingId = hidingId,
+					level = result.level,
+					rate = result.rate,
+					timeToFirstBreak = result.occupiedDuration,
+					occupants = table.concat(self._hiding:GetOccupants(hidingId), ","),
+				}, now)
 			elseif result.state == "Broken" and previous ~= "Broken" then
 				self._hiding:ApplySilenceState(hidingId, result.state, previous, now)
 				self._noise:Add({
@@ -59,11 +126,12 @@ function SilenceMonitor:Tick(elapsed: number, now: number)
 					sourceId = hidingId,
 					hunterRelevant = true,
 				}, now)
-				self._analytics:Emit(
-					"silence_broken",
-					{ hidingId = hidingId, risk = result.risk },
-					now
-				)
+				self._analytics:Emit("breath_broken", {
+					hidingId = hidingId,
+					level = result.level,
+					rate = result.rate,
+					timeToFirstBreak = result.occupiedDuration,
+				}, now)
 			end
 		end
 	end

@@ -2,7 +2,7 @@
 
 HIDE! is a social panic survival game for Roblox. Survivors share hiding places whose danger rises with occupancy, movement, door actions, and accumulated attention. The Listener hunts evidence rather than receiving hidden player locations.
 
-Phase 1 is a source-first technical MVP. It contains deterministic gameplay domains, server-authoritative runtime boundaries, mobile-friendly interaction contracts, tests, and a Rojo build. It intentionally contains no finished map, art, production place, economy, or persistence.
+The current Phase-2 branch turns the approved source foundation into a source-generated Roblox Studio MVP: one fictional Le Morne resort greybox, server-owned physical interactions, The Listener, responsive mobile HUD, storm presentation, and Roblox-native telemetry. It intentionally contains no economy, persistence, paid assets, or second map.
 
 ## Core thesis
 
@@ -44,13 +44,13 @@ tests/                  Lune unit and adversarial tests
 docs/                   architecture, gameplay, security, audit, handoff
 ```
 
-## Roblox Studio boundary
+## Roblox Studio workflow
 
-GitHub is the source of truth. Phase 2 may sync this repository into Studio with Rojo and construct tagged world instances, but it must not replace the source modules with Studio-only logic. See `docs/PHASE1_HANDOFF.md` for the exact Studio-dependent work.
+GitHub remains the source of truth. Rojo builds the place from this repository; `WorldBuilder` deterministically creates the tagged resort at server start before `WorldRegistry` binds gameplay. Studio is used for runtime validation, screenshots, and multiplayer tests—not for hidden gameplay scripts. See `docs/PHASE2_BUILD.md` for the current evidence and remaining limitations.
 
 ## Status
 
-Phase 1 is prepared on `phase-1/core-foundation` and is not a playable production experience until the documented Studio bindings and map are completed in Phase 2.
+Phase 1 was merged to `main`. Phase 2 is under active review on `phase-2/mauritius-playable`; it is playable in Studio but has not been published to Roblox production.
 
 ## License
 

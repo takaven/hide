@@ -33,6 +33,16 @@ return {
 		invalidRescueGrace.Rescue = table.clone(Config.Rescue)
 		invalidRescueGrace.Rescue.RangeGraceSeconds = -1
 		Assert.falsy(ConfigValidator.validate(invalidRescueGrace))
+		local invalidMovementRange = table.clone(Config)
+		invalidMovementRange.MovementNoise = table.clone(Config.MovementNoise)
+		invalidMovementRange.MovementNoise.SpeedForMaximum = Config.MovementNoise.MinimumSpeed
+		Assert.falsy(ConfigValidator.validate(invalidMovementRange))
+		local invalidSurface = table.clone(Config)
+		invalidSurface.MovementNoise = table.clone(Config.MovementNoise)
+		invalidSurface.MovementNoise.SurfaceMultipliers =
+			table.clone(Config.MovementNoise.SurfaceMultipliers)
+		invalidSurface.MovementNoise.SurfaceMultipliers.Metal = 0
+		Assert.falsy(ConfigValidator.validate(invalidSurface))
 
 		local analytics = AnalyticsBus.new()
 		Assert.truthy(analytics:Emit("entry_refused", { hidingId = "wardrobe-a" }, 1))

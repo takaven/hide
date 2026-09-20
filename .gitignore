@@ -43,6 +43,7 @@ desktop.ini
 coverage/
 tmp/
 temp/
+.codex-temp/
 *.tmp
 *.bak
 

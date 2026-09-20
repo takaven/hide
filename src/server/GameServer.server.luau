@@ -2,40 +2,92 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local ServerStorage = game:GetService("ServerStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local Config = require(ReplicatedStorage.Hide.Shared.Config)
 local ConfigValidator = require(ReplicatedStorage.Hide.Shared.ConfigValidator)
+local EnvironmentConfig = require(ReplicatedStorage.Hide.Shared.EnvironmentConfig)
 
 local Domain = ServerScriptService.Hide.domain
 local Runtime = ServerScriptService.Hide.runtime
 
 local ActionService = require(Runtime.ActionService)
+local AIGuestService = require(Runtime.AIGuestService)
+local HighlightTracker = require(Domain.HighlightTracker)
+local PrototypeRecap = require(Domain.PrototypeRecap)
 local AnalyticsBus = require(Domain.AnalyticsBus)
+local AudioPresentationService = require(Runtime.AudioPresentationService)
 local CaptureService = require(Runtime.CaptureService)
+local CharacterPresentationService = require(Runtime.CharacterPresentationService)
 local DecoySystem = require(Domain.DecoySystem)
 local DoorSystem = require(Domain.DoorSystem)
+local DoorPresentationService = require(Runtime.DoorPresentationService)
+local DownedEvidenceService = require(Runtime.DownedEvidenceService)
 local ExtractionSystem = require(Domain.ExtractionSystem)
+local ExtractionRuntimeService = require(Runtime.ExtractionRuntimeService)
 local HidingSystem = require(Domain.HidingSystem)
 local HunterService = require(Runtime.HunterService)
 local InteractionBinder = require(Runtime.InteractionBinder)
 local NoiseLedger = require(Domain.NoiseLedger)
+local MovementNoiseService = require(Runtime.MovementNoiseService)
+local MovieMomentDirector = require(Runtime.MovieMomentDirector)
 local PlayerStates = require(Domain.PlayerStates)
 local PlayerLifecycle = require(Domain.PlayerLifecycle)
 local PlayerLifecycleService = require(Runtime.PlayerLifecycleService)
+local PowerObjective = require(Domain.PowerObjective)
+local PowerObjectiveService = require(Runtime.PowerObjectiveService)
+local PlayerStatePresentationService = require(Runtime.PlayerStatePresentationService)
 local RemoteGateway = require(Runtime.RemoteGateway)
 local Remotes = require(Runtime.Remotes)
+local RobloxAnalyticsProvider = require(Runtime.RobloxAnalyticsProvider)
 local RescueSystem = require(Domain.RescueSystem)
+local RematchCoordinator = require(Domain.RematchCoordinator)
 local RescueMonitor = require(Runtime.RescueMonitor)
+local RescueInteractionService = require(Runtime.RescueInteractionService)
 local RoundService = require(Runtime.RoundService)
 local SilenceMonitor = require(Runtime.SilenceMonitor)
+local SoakMetricsService = require(Runtime.SoakMetricsService)
+local StormPresentationService = require(Runtime.StormPresentationService)
+local StationaryExposureService = require(Runtime.StationaryExposureService)
+local StudioTestOverrides = require(Runtime.StudioTestOverrides)
+local StudioCaptureRunnerService = require(Runtime.StudioCaptureRunnerService)
 local WorldRegistry = require(Runtime.WorldRegistry)
+local WorldBuilder = require(Runtime.WorldBuilder)
+local ListenerPresentationService = require(Runtime.ListenerPresentationService)
 
+StudioTestOverrides.Apply(Config)
 local configValid, configErrors = ConfigValidator.validate(Config)
 assert(configValid, `invalid HIDE config: {table.concat(configErrors, "; ")}`)
 
+local worldRoot = WorldBuilder.Build()
+local storm = StormPresentationService.new(worldRoot)
+storm:Start()
+local audio = AudioPresentationService.new(worldRoot)
+
 local remotes = Remotes.create()
-local analytics = AnalyticsBus.new()
+local environmentName, resolvedEnvironmentProfile = EnvironmentConfig.resolve(
+	Config,
+	workspace:GetAttribute("HideEnvironment"),
+	workspace:GetAttribute("HideHumanOnlyTest") == true
+)
+local environmentProfile = table.clone(resolvedEnvironmentProfile)
+if Config.Prototype.Enabled then
+	environmentProfile.AIGuestsEnabled = Config.Prototype.AIGuestsEnabled
+end
+workspace:SetAttribute("ResolvedHideEnvironment", environmentName)
+workspace:SetAttribute("ResolvedHumanOnlyTest", environmentProfile.HumanOnly == true)
+local analyticsProvider = if environmentProfile.AnalyticsEnabled
+	then RobloxAnalyticsProvider.new("mauritius-le-morne-storm-resort")
+	else nil
+local analytics = AnalyticsBus.new(analyticsProvider)
+local recognition = HighlightTracker.new()
+local recap = PrototypeRecap.new()
+analytics:Subscribe(function(envelope)
+	recognition:Observe(envelope)
+	recap:Observe(envelope)
+end)
 local playerStates = PlayerStates.new()
 local noise = NoiseLedger.new(Config.Noise)
 local hiding = HidingSystem.new(Config)
@@ -44,10 +96,14 @@ local rescue = RescueSystem.new(Config)
 local decoys = DecoySystem.new(Config)
 local extraction = ExtractionSystem.new(Config)
 local world = WorldRegistry.new()
+local rematch = RematchCoordinator.new(Config)
+local powerObjective = PowerObjective.new(Config)
 
 for _, issue in ipairs(world:Scan()) do
 	warn(`[HIDE] world binding: {issue}`)
 end
+
+local presentation = CharacterPresentationService.new(world)
 for hidingId, record in pairs(world.Hiding) do
 	local ok, err =
 		hiding:Register(hidingId, record.capacity, record.position, record.approachPosition)
@@ -68,17 +124,89 @@ for extractionId, record in pairs(world.Extractions) do
 	end
 end
 
-local round = RoundService.new(Config, playerStates, extraction, decoys, analytics, remotes)
-local capture = CaptureService.new(Config, playerStates, hiding, analytics, remotes)
+local capture = CaptureService.new(Config, playerStates, hiding, analytics, remotes, presentation)
+local extractionRuntime = ExtractionRuntimeService.new(hiding, playerStates, presentation, remotes)
+local aiGuests = AIGuestService.new({
+	Config = Config,
+	Profile = environmentProfile,
+	PlayerStates = playerStates,
+	Hiding = hiding,
+	Rescue = rescue,
+	Capture = capture,
+	Extraction = extraction,
+	Noise = noise,
+	Analytics = analytics,
+	World = world,
+	Presentation = presentation,
+	Remotes = remotes,
+})
+aiGuests:Reconcile(workspace:GetServerTimeNow())
+local round = RoundService.new(
+	Config,
+	playerStates,
+	extraction,
+	decoys,
+	analytics,
+	remotes,
+	extractionRuntime,
+	{
+		Rematch = rematch,
+		Recognition = recognition,
+		Recap = recap,
+		ParticipantIds = function()
+			return aiGuests:GetParticipantIds()
+		end,
+	}
+)
+local power = PowerObjectiveService.new({
+	Config = Config,
+	Objective = powerObjective,
+	Round = round,
+	PlayerStates = playerStates,
+	Noise = noise,
+	Analytics = analytics,
+	Remotes = remotes,
+	Audio = audio,
+	WorldRoot = worldRoot,
+})
+remotes.GetStateSnapshot.OnServerInvoke = function(player: Player)
+	local playerId = tostring(player.UserId)
+	local state = playerStates:Get(playerId) or "Spectating"
+	local snapshot: any = {
+		state = state,
+		phase = round:GetState(),
+		deadline = round:GetDeadline(),
+		activeExtractionId = extraction:GetActiveId(),
+		powerState = powerObjective:GetState(),
+	}
+	if state == "Hiding" then
+		local hidingId = hiding:GetPlayerSpot(playerId)
+		if hidingId ~= nil then
+			local record = world.Hiding[hidingId]
+			snapshot.contextAction = {
+				action = "VolunteerOut",
+				targetField = "hidingId",
+				targetId = hidingId,
+				label = "VOLUNTEER OUT",
+			}
+			snapshot.peekAction = { hidingId = hidingId }
+			if record ~= nil then
+				snapshot.hidingCamera = { cframe = record.hidingCameraCFrame }
+			end
+		end
+	end
+	return snapshot
+end
 local lifecycle = PlayerLifecycle.new({
 	PlayerStates = playerStates,
 	Hiding = hiding,
 	Doors = doors,
 	Rescue = rescue,
 	Capture = capture,
+	Presentation = presentation,
 })
 local lifecycleService = PlayerLifecycleService.new(lifecycle, remotes)
-local rescueMonitor = RescueMonitor.new(rescue, playerStates, world)
+local rescueMonitor = RescueMonitor.new(rescue, playerStates, world, analytics, aiGuests)
 local actionService = ActionService.new({
 	Config = Config,
 	Round = round,
@@ -93,17 +221,144 @@ local actionService = ActionService.new({
 	Analytics = analytics,
 	WorldRegistry = world,
 	Remotes = remotes,
+	Presentation = presentation,
+	Audio = audio,
+	Rematch = rematch,
 })
 local gateway = RemoteGateway.new(Config, remotes, actionService)
 local interactions = InteractionBinder.new(Config, world, gateway)
-local silence = SilenceMonitor.new(hiding, noise, analytics)
+local silence = SilenceMonitor.new(Config, hiding, noise, analytics, remotes)
+local movementNoise = MovementNoiseService.new(Config, playerStates, noise, analytics)
+local stationaryExposure =
+	StationaryExposureService.new(Config, playerStates, noise, analytics, remotes)
+local downedEvidence = DownedEvidenceService.new(Config, playerStates, noise)
+local statePresentation = PlayerStatePresentationService.new(playerStates, worldRoot)
+local doorPresentation =
+	DoorPresentationService.new(world, doors, playerStates, Config.Interaction.MaxDistance, audio)
+local rescueInteractions = RescueInteractionService.new(Config, playerStates, rescue, gateway)
 local hunter =
-	HunterService.new(Config, world, playerStates, hiding, noise, capture, analytics, round)
+	HunterService.new(Config, world, playerStates, hiding, noise, capture, analytics, round, audio)
+local listenerModel = world.Hunters[1]
+local listenerPresentation = if listenerModel and listenerModel:IsA("Model")
+	then ListenerPresentationService.new(listenerModel)
+	else nil
+actionService.Hunter = hunter
+local studioCaptureRunner = StudioCaptureRunnerService.new({
+	Config = Config,
+	WorldRoot = worldRoot,
+	World = world,
+	PlayerStates = playerStates,
+	Hiding = hiding,
+	Presentation = presentation,
+	Hunter = hunter,
+	Power = power,
+	Audio = audio,
+	Remotes = remotes,
+})
+local movieMoments = MovieMomentDirector.new({
+	Config = Config,
+	WorldRoot = worldRoot,
+	Noise = noise,
+	Extraction = extraction,
+	Hunter = hunter,
+	Audio = audio,
+	Analytics = analytics,
+	Remotes = remotes,
+})
+local soakMetrics = SoakMetricsService.new(hiding, noise, analytics)
+if RunService:IsStudio() then
+	local momentTestTrigger = Instance.new("BindableFunction")
+	momentTestTrigger.Name = "MovieMomentTestTrigger"
+	momentTestTrigger.OnInvoke = function(kind: string)
+		movieMoments:ResetRound()
+		return movieMoments:Trigger(kind, workspace:GetServerTimeNow())
+	end
+	momentTestTrigger.Parent = ServerStorage
+	local diagnostics = Instance.new("BindableFunction")
+	diagnostics.Name = "HideStudioDiagnostics"
+	diagnostics.OnInvoke = function()
+		return soakMetrics:GetReport()
+	end
+	diagnostics.Parent = ServerStorage
+	local stagingGateTest = Instance.new("BindableFunction")
+	stagingGateTest.Name = "HideStudioStagingGate"
+	stagingGateTest.OnInvoke = function(mode: string?)
+		local player = Players:GetPlayers()[1]
+		if player == nil then
+			return { ok = false, error = "no player" }
+		end
+		local playerId = tostring(player.UserId)
+		local now = workspace:GetServerTimeNow()
+		playerStates:ResetForRound({ playerId }, now)
+		capture:Down(playerId, now, "studio_reset_regression")
+		playerStates:ResolveDowned(playerId, 1, false, now)
+		statePresentation:Tick()
+		local spectatorSpawn = worldRoot:FindFirstChild("SpectatorSpawn", true)
+		local terminalPosition = if player.Character
+			then player.Character:GetPivot().Position
+			else nil
+		if mode == "eliminate_only" then
+			return {
+				ok = playerStates:Get(playerId) == "Eliminated",
+				state = playerStates:Get(playerId),
+				positionY = if terminalPosition then terminalPosition.Y else nil,
+			}
+		end
+		capture:ResetRound()
+		statePresentation:ResetRound()
+		playerStates:ResetForRound({ playerId }, now + 1)
+		statePresentation:Tick()
+		local character = player.Character
+		local humanoid = if character then character:FindFirstChildOfClass("Humanoid") else nil
+		local arrivalSpawn = worldRoot:FindFirstChild("ArrivalSpawn", true)
+		local finalPosition = if character then character:GetPivot().Position else nil
+		return {
+			ok = playerStates:Get(playerId) == "Active"
+				and humanoid ~= nil
+				and humanoid.Health > 0
+				and finalPosition ~= nil
+				and arrivalSpawn ~= nil
+				and arrivalSpawn:IsA("BasePart")
+				and (finalPosition - arrivalSpawn.Position).Magnitude < 8,
+			state = playerStates:Get(playerId),
+			captureCount = playerStates:GetCaptureCount(playerId),
+			health = if humanoid then humanoid.Health else 0,
+			terminalPosition = terminalPosition,
+			finalPosition = finalPosition,
+			spectatorSpawnPosition = if spectatorSpawn and spectatorSpawn:IsA("BasePart")
+				then spectatorSpawn.Position
+				else nil,
+			arrivalPosition = if arrivalSpawn and arrivalSpawn:IsA("BasePart")
+				then arrivalSpawn.Position
+				else nil,
+		}
+	end
+	stagingGateTest.Parent = ServerStorage
+end
 
 local function registerPlayer(player: Player)
-	playerStates:Add(tostring(player.UserId), false)
+	local phase = round:GetState()
+	local joinActive = phase == "Lobby" or phase == "Prepare"
+	playerStates:Add(tostring(player.UserId), joinActive)
+	for _, existing in ipairs(Players:GetPlayers()) do
+		if existing ~= player then
+			local ok, friends = pcall(player.IsFriendsWith, player, existing.UserId)
+			if ok and friends then
+				analytics:Emit("invite_coplay_detected", {
+					playerId = tostring(player.UserId),
+					friendPlayerId = tostring(existing.UserId),
+				}, workspace:GetServerTimeNow())
+				break
+			end
+		end
+	end
 	lifecycleService:Attach(player)
-	remotes.StateSnapshot:FireClient(player, { state = "Spectating" })
+	remotes.StateSnapshot:FireClient(player, {
+		state = playerStates:Get(tostring(player.UserId)),
+		phase = phase,
+		deadline = round:GetDeadline(),
+		activeExtractionId = extraction:GetActiveId(),
+	})
 end
 
 for _, player in ipairs(Players:GetPlayers()) do
@@ -111,14 +366,41 @@ for _, player in ipairs(Players:GetPlayers()) do
 end
 Players.PlayerAdded:Connect(registerPlayer)
 
-for _, resetter in ipairs({ hiding, doors, rescue, extraction, noise, capture, silence }) do
+for _, resetter in ipairs({
+	hiding,
+	doors,
+	rescue,
+	extraction,
+	noise,
+	capture,
+	silence,
+	presentation,
+	movementNoise,
+	stationaryExposure,
+	doorPresentation,
+	rescueInteractions,
+	downedEvidence,
+	statePresentation,
+	hunter,
+	movieMoments,
+	soakMetrics,
+	aiGuests,
+	rematch,
+	recognition,
+	recap,
+	power,
+}) do
 	round:AddResetter(resetter)
+end
+if listenerPresentation ~= nil then
+	round:AddResetter(listenerPresentation)
 end
 
 gateway:Start()
 interactions:BindAll()
 round:Start()
 local hunterActive = hunter:Start()
+studioCaptureRunner:Start()
 if not hunterActive then
 	warn("[HIDE] The Listener is inactive until Phase 2 supplies one tagged hunter model")
 end
@@ -128,7 +410,7 @@ Players.PlayerRemoving:Connect(function(player)
 	lifecycleService:Remove(player)
 	analytics:Emit(
 		"player_quit",
-		{ playerId = playerId, phase = round:GetState() },
+		{ playerId = playerId, phase = round:GetState(), state = playerStates:Get(playerId) },
 		workspace:GetServerTimeNow()
 	)
 	playerStates:Remove(playerId)
@@ -142,9 +424,19 @@ task.spawn(function()
 		lastTick = now
 		capture:Tick(now)
 		doors:Tick(now)
+		doorPresentation:Tick(now)
 		rescueMonitor:Tick(now)
+		rescueInteractions:Tick()
 		silence:Tick(elapsed, now)
+		movementNoise:Tick(now)
+		stationaryExposure:Tick(now)
+		downedEvidence:Tick(now)
+		statePresentation:Tick()
 		hunter:Tick(now)
+		power:Tick(now)
+		movieMoments:Tick(now, round:GetState())
+		soakMetrics:Tick(now)
+		aiGuests:Tick(now, round:GetState())
 		task.wait(0.25)
 	end
 end)

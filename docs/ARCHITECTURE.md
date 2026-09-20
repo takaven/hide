@@ -1,5 +1,13 @@
 # Architecture
 
+## Vertical-slice presentation boundary
+
+`PowerObjective` owns the testable blackout/fuse state. `PowerObjectiveService` binds that domain
+to the world prompt, validates character state and distance, drives lights, emits evidence and
+analytics, and broadcasts presentation snapshots. `ListenerPresentationService` reads only
+server-owned Listener state attributes and poses the source-built joints; it cannot choose targets
+or captures. `WorldBuilder` remains the source of truth for the vertical-slice art layer.
+
 ## Decision summary
 
 HIDE! uses a small, original, service-oriented Luau architecture without a gameplay framework or runtime package dependency. Deterministic domains own rules; Roblox runtime adapters own Instances, players, remotes, pathfinding, and timing. The server owns every consequential result.
@@ -24,7 +32,7 @@ mobile / keyboard / controller input
 
 ### `src/shared`
 
-- `Config.luau` is the single balance surface for players, phases, proximity, Shared Silence, noise, heat, doors, rescue, decoys, extraction, The Listener, and remote controls.
+- `Config.luau` is the single balance surface for players, phases, proximity, Breath, The Stop, noise, heat, doors, rescue, The Draw, extraction, The Listener, prototype flags, and remote controls.
 - `ConfigValidator.luau` rejects missing, non-finite, negative, or contradictory settings at server startup and in tests.
 - `RemoteProtocol.luau` and `ActionValidator.luau` declare and validate the only accepted client action shapes.
 
@@ -36,7 +44,7 @@ These modules avoid Roblox services so Lune can test their rules directly:
 
 - state machines for rounds, players, and The Listener;
 - authoritative character lifecycle cleanup across hiding, doors, rescue, and capture;
-- Shared Silence risk calculation;
+- occupancy-scaled Breath calculation and stationary freeform pressure;
 - hiding occupancy, Let Me In requests, acceptance/refusal, heat, and exposure-or-heat inspection eligibility;
 - noise creation, validation, decay, and evidence projection;
 - Hold the Door leases;
@@ -48,21 +56,33 @@ These modules avoid Roblox services so Lune can test their rules directly:
 
 ### `src/server/runtime`
 
+- `WorldBuilder` creates the compact fictional Le Morne resort, enclosed gameplay rooms and corridors, authored interaction/peek/inspection points, patrol network, two extraction routes, storm presentation, and original primitive Listener from repository code before world discovery.
 - `WorldRegistry` reads server-visible CollectionService tags and validates IDs, capacities, and positions.
 - `InteractionBinder` creates native ProximityPrompts for hiding, doors, and extraction. Prompt events re-enter the same validated gateway as explicit remotes.
 - `RemoteGateway` rejects malformed, unknown, replayed, or excessive requests before dispatch.
 - `ActionService` re-checks round/player state, server-derived distance, occupancy, ownership, time, and availability before mutating a domain.
-- `RoundService`, `CaptureService`, `RescueMonitor`, and `SilenceMonitor` own time-dependent transitions.
-- `PlayerLifecycleService` translates character creation, death/reset, and player removal into one tested cleanup coordinator.
-- `HunterService` feeds visual, noise, and heat evidence into `HunterBrain`, inspects only locally reached exposed-or-hot hiding spots, and requests movement through a navigation provider.
+- `RoundService`, `CaptureService`, `RescueMonitor`, `RescueInteractionService`, `DownedEvidenceService`, and `SilenceMonitor` own time-dependent transitions and contextual presentation. `SilenceMonitor` treats suspicion-tier changes as snapshot boundaries instead of waiting for an unrelated risk delta.
+- `PlayerLifecycleService` translates character creation, death/reset, and player removal into one tested cleanup coordinator. `RoundPlayerReset` defines the fail-closed terminal reset plan; `PlayerStatePresentationService` executes it by relocating a secured live rig to `ArrivalSpawn` or reloading a dead/missing character before the new round.
+- `HunterService` feeds visual, noise, heat, and broken-Breath evidence into `HunterBrain`, performs The Stop near occupied shelters from any non-chase brain state (including an evidence investigation), cancels navigation and freezes/orients the unanchored Humanoid for the bounded listen, honours a bounded Draw commitment, inspects only locally reached discoverable hiding spots, requests movement through a navigation provider, and resets both brain and physical rig to the authored start between rounds.
 - `NativeNavigationProvider` uses PathfindingService with cancellation, stuck detection, bounded replanning, and status reporting.
+- `CharacterPresentationService` conceals and immobilises hiding avatars on the server. `PlayerStatePresentationService` immobilises downed players, shows a bounded rescue marker, and makes eliminated/escaped/spectating characters non-physical and non-queryable. `DoorPresentationService` turns a server lease into a physical brace: the door is held shut while the helper is immobilised and exposed. `ExtractionRuntimeService` ejects hiders when extraction begins.
+- `MovementNoiseService` samples server-observed assembly velocity and floor material. `StationaryExposureService` stages the anti-freeform-camping rule: a six-second storm-exposure cue warns the player before server-owned evidence begins at twelve seconds, and movement clears the presentation. `RobloxAnalyticsProvider` maps the allow-listed analytics bus to server-side `AnalyticsService` custom events without PII fields.
+- `AudioPresentationService` supplies spatial Listener, hiding, door, rescue, decoy, phone, and extraction cues using redistribution-safe Roblox packaged sounds. `MovieMomentDirector` selects at most two bounded authored events per round. `SoakMetricsService` records occupancy, evidence-ledger peak, and event counts for Studio diagnostics.
 - `Remotes` creates a fixed set of remotes with class checks.
 
 ### `src/client`
 
-The client presents contextual actions. Roblox native prompts provide phone, keyboard, and controller affordances for world interactions. ContextActionService supplies large touch actions for exit and the Let Me In accept/refuse decision. The client never calculates authoritative success.
+The client presents contextual actions. Roblox native prompts provide phone, keyboard, and controller affordances for world interactions. ContextActionService supplies large touch actions for VOLUNTEER OUT, risky peek, DISTRACT, spectator cycling, and the Let Me In accept/refuse decision. Bindings are tracked before cleanup so an unbound-action warning cannot be produced during ordinary state churn. Let Me In has explicit context priority: it removes shelter controls while the decision is live, then restores them after resolution or expiry. The Breath panel uses paired pulsing lung shapes, colour, and concise pressure language rather than exposing an authoritative numeric rule. Authored per-shelter camera and exit points prevent the concealed avatar, wall clipping, and a reveal directly on the inspection point. Mobile placement keeps the Breath panel above the compact action cluster. After subscribing to events, the client invokes a read-only state snapshot function so a startup race cannot strand it in stale spectator presentation. The client never calculates authoritative success.
 
 ## Runtime ownership
+
+`EnvironmentConfig` resolves explicit Development, Staging, and Production profiles from a workspace attribute without embedding universe/place IDs. The Breath proof overrides AI fill off through `Prototype.AIGuestsEnabled = false`; no AI guest may influence the first blind result. The previous AI implementation remains source-controlled and can be re-enabled after the core thesis is decided. The existing `HideHumanOnlyTest` switch remains available for staging isolation.
+
+`staging.project.json` is the reproducible publication input for the private test experience. It carries only non-secret environment attributes and maps the same repository-owned client, server, and shared source as the default project; the generated `.rbxlx` remains ignored.
+
+Both Rojo projects explicitly use Roblox's modern `Soft` lighting style. This records the Compatibility-to-Voxel migration selected by Studio and prevents the lighting result from existing only as unpublished place metadata.
+
+`HighlightTracker` observes the provider-neutral analytics bus. It derives a bounded moment-of-the-round and positive Results awards from events the server already accepted; it does not add a replay engine or client-authored scoring. `RematchCoordinator` accepts one Results-only request per player and advances through the legal Results → Lobby → Prepare transitions after a short configurable delay.
 
 | Concern | Owner | Client responsibility |
 |---|---|---|
@@ -76,19 +96,19 @@ The client presents contextual actions. Roblox native prompts provide phone, key
 | Hunter sensing and navigation | Server | Presentation only |
 | Analytics | Server | None |
 
-## World contract for Phase 2
+## World contract and current map binding
 
 World construction is intentionally data-driven through tags and attributes:
 
 | Tag | Instance | Required attributes |
 |---|---|---|
-| `HideHidingSpot` | BasePart or Model | `HidingId: string`, `Capacity: integer >= 1`; optional descendant BasePart/Attachment named `HunterApproach` |
+| `HideHidingSpot` | BasePart or Model | `HidingId: string`, `Capacity: integer >= 1`; descendants named `HiddenPoint`, `HunterApproach`, and `PeekPoint` in the current map |
 | `HideDoor` | BasePart or Model | `DoorId: string` |
-| `HideExtraction` | BasePart or Model | `ExtractionId: string` |
+| `HideExtraction` | BasePart or Model | `ExtractionId: string`; optional descendant `ExtractionApproach` supplies the reachable activation point |
 | `HideHunter` | Model | Humanoid and HumanoidRootPart |
 | `HidePatrolPoint` | BasePart or Model | none |
 
-IDs are limited to 64 characters at the network boundary. Phase 2 must ensure uniqueness and create a Mauritius-inspired fictional resort greybox without embedding game logic in the place.
+IDs are limited to 64 characters at the network boundary. The current `WorldBuilder` supplies six hiding spots with ten total slots, three braceable doors, two alternating extraction routes, eight patrol points, and one Listener. Every hiding spot has authored `HiddenPoint`, `HunterApproach`, and `PeekPoint` parts. Both solid extraction gates have an interior, walkable `ExtractionApproach`; pathing and distance validation use that point instead of the collidable gate pivot. The Listener uses a welded non-avatar Humanoid rig with neck-death disabled so long sessions cannot silently remove the threat. A later art pass may replace geometry while preserving these tags, attributes, and identifiers.
 
 `HunterApproach` is the navigation-safe inspection point outside a wardrobe, bed, or cabinet. If absent, the hiding pivot is the fallback. Navigation completion, failure, cancellation, and investigation timeout are distinct brain inputs; failure never masquerades as arrival. Every movement command has a generation, and a new investigation binds the generation created for its own forced `MoveTo`. Only matching-generation arrival/completion can authorize inspection.
 
@@ -103,5 +123,5 @@ CI applies Luau analysis with the pinned Roblox definitions and Rojo sourcemap t
 - No persistence, economy, shop, rewards, inventory framework, or monetisation.
 - No additional hunter implementation: native navigation must first fail in measured Studio tests.
 - No dynamic remote factory exposed to feature code.
-- No finished map or Studio-authored scripts.
-- No Open Cloud deployment in Phase 1.
+- No Studio-authored gameplay scripts or unpublished source-of-truth mutations.
+- No Open Cloud deployment or production place publication in this branch.

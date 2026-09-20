@@ -24,9 +24,11 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 	local maxPlayers = field(config, "MaxPlayers")
 	local round = field(config, "Round")
 	local minimumPlayers = field(round, "MinimumPlayers")
+	local studioMinimumPlayers = field(round, "StudioMinimumPlayers")
 	local durations = field(round, "Durations")
 	positive(errors, "MaxPlayers", maxPlayers)
 	positive(errors, "Round.MinimumPlayers", minimumPlayers)
+	positive(errors, "Round.StudioMinimumPlayers", studioMinimumPlayers)
 	if
 		type(minimumPlayers) == "number"
 		and type(maxPlayers) == "number"
@@ -34,10 +36,185 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 	then
 		table.insert(errors, "Round.MinimumPlayers cannot exceed MaxPlayers")
 	end
+	if
+		type(studioMinimumPlayers) == "number"
+		and type(maxPlayers) == "number"
+		and studioMinimumPlayers > maxPlayers
+	then
+		table.insert(errors, "Round.StudioMinimumPlayers cannot exceed MaxPlayers")
+	end
 
 	for _, phase in ipairs({ "Lobby", "Prepare", "Hunt", "Relocation", "Extraction", "Results" }) do
 		positive(errors, `Round.Durations.{phase}`, field(durations, phase))
 	end
+	local environment = field(config, "Environment")
+	local profiles = field(environment, "Profiles")
+	local defaultEnvironment = field(environment, "Default")
+	if
+		type(defaultEnvironment) ~= "string"
+		or type(profiles) ~= "table"
+		or profiles[defaultEnvironment] == nil
+	then
+		table.insert(errors, "Environment.Default must name a configured profile")
+	end
+	if type(profiles) == "table" then
+		for _, profileName in ipairs({ "Development", "Staging", "Production" }) do
+			local profile = profiles[profileName]
+			if type(profile) ~= "table" then
+				table.insert(errors, `Environment.Profiles.{profileName} must be configured`)
+			elseif
+				type(profile.AnalyticsEnabled) ~= "boolean"
+				or type(profile.AIGuestsEnabled) ~= "boolean"
+				or type(profile.HumanOnly) ~= "boolean"
+			then
+				table.insert(errors, `Environment.Profiles.{profileName} flags must be boolean`)
+			end
+		end
+	end
+	local aiGuests = field(config, "AIGuests")
+	local prototype = field(config, "Prototype")
+	for _, key in ipairs({
+		"Enabled",
+		"EvictEnabled",
+		"VoicePressureEnabled",
+		"AIGuestsEnabled",
+		"MovieMomentsEnabled",
+		"DecoyItemsEnabled",
+		"SocialAwardsEnabled",
+	}) do
+		if type(field(prototype, key)) ~= "boolean" then
+			table.insert(errors, `Prototype.{key} must be boolean`)
+		end
+	end
+	local breath = field(config, "Breath")
+	for _, key in ipairs({
+		"BaseRatePerSecond",
+		"WarningThreshold",
+		"CriticalThreshold",
+		"Maximum",
+		"EmptyDecayPerSecond",
+		"ExitRelief",
+		"EntryIncreasePerOccupant",
+	}) do
+		positive(errors, `Breath.{key}`, field(breath, key), key == "ExitRelief")
+	end
+	local breathMultipliers = field(breath, "OccupancyMultipliers")
+	if type(breathMultipliers) ~= "table" or #breathMultipliers < 4 then
+		table.insert(errors, "Breath.OccupancyMultipliers must define 1-4 occupants")
+	else
+		local previous = 0
+		for index = 1, 4 do
+			local multiplier = breathMultipliers[index]
+			positive(errors, `Breath.OccupancyMultipliers.{index}`, multiplier)
+			if type(multiplier) == "number" and multiplier <= previous then
+				table.insert(errors, "Breath occupancy multipliers must strictly increase")
+			end
+			previous = if type(multiplier) == "number" then multiplier else previous
+		end
+	end
+	if type(breath) == "table" then
+		local warning = breath.WarningThreshold
+		local critical = breath.CriticalThreshold
+		local maximum = breath.Maximum
+		if
+			type(warning) ~= "number"
+			or type(critical) ~= "number"
+			or type(maximum) ~= "number"
+			or not (0 < warning and warning < critical and critical < maximum and maximum <= 1)
+		then
+			table.insert(errors, "Breath thresholds must increase within 0..1")
+		end
+	end
+	local listenerStop = field(config, "ListenerStop")
+	for _, key in ipairs({
+		"MinimumDuration",
+		"MaximumDuration",
+		"DefaultDuration",
+		"RoomRadius",
+		"BreathMultiplier",
+		"Cooldown",
+	}) do
+		positive(errors, `ListenerStop.{key}`, field(listenerStop, key))
+	end
+	if type(listenerStop) == "table" then
+		if listenerStop.MaximumDuration < listenerStop.MinimumDuration then
+			table.insert(errors, "ListenerStop.MaximumDuration must be >= MinimumDuration")
+		end
+		if
+			listenerStop.DefaultDuration < listenerStop.MinimumDuration
+			or listenerStop.DefaultDuration > listenerStop.MaximumDuration
+		then
+			table.insert(errors, "ListenerStop.DefaultDuration must be inside its duration range")
+		end
+		if listenerStop.BreathMultiplier <= 1 then
+			table.insert(errors, "ListenerStop.BreathMultiplier must exceed 1")
+		end
+	end
+	local draw = field(config, "Draw")
+	positive(errors, "Draw.Magnitude", field(draw, "Magnitude"))
+	positive(errors, "Draw.CommitDuration", field(draw, "CommitDuration"))
+	positive(errors, "Draw.Cooldown", field(draw, "Cooldown"))
+	local fuse = field(config, "Fuse")
+	positive(errors, "Fuse.InteractionDuration", field(fuse, "InteractionDuration"))
+	positive(errors, "Fuse.MaxDistance", field(fuse, "MaxDistance"))
+	positive(errors, "Fuse.NoiseMagnitude", field(fuse, "NoiseMagnitude"))
+	local movement = field(config, "Movement")
+	positive(errors, "Movement.WalkSpeed", field(movement, "WalkSpeed"))
+	positive(errors, "Movement.CrouchSpeed", field(movement, "CrouchSpeed"))
+	if
+		type(movement) ~= "table"
+		or type(movement.WalkSpeed) ~= "number"
+		or type(movement.CrouchSpeed) ~= "number"
+		or movement.CrouchSpeed >= movement.WalkSpeed
+	then
+		table.insert(errors, "Movement.CrouchSpeed must be below WalkSpeed")
+	end
+	local freeform = field(config, "FreeformPressure")
+	for _, key in ipairs({
+		"CueSeconds",
+		"GraceSeconds",
+		"EvidenceInterval",
+		"EvidenceMagnitude",
+		"MovementThreshold",
+	}) do
+		positive(errors, `FreeformPressure.{key}`, field(freeform, key))
+	end
+	if
+		type(freeform) ~= "table"
+		or type(freeform.CueSeconds) ~= "number"
+		or type(freeform.GraceSeconds) ~= "number"
+		or freeform.CueSeconds >= freeform.GraceSeconds
+	then
+		table.insert(errors, "FreeformPressure.CueSeconds must be below GraceSeconds")
+	end
+	for _, key in ipairs({
+		"TargetParticipants",
+		"MaximumGuests",
+		"ThinkInterval",
+		"WalkSpeed",
+		"ArrivalDistance",
+		"RelocateHeatThreshold",
+		"RescuePerceptionDistance",
+		"HunterPerceptionDistance",
+	}) do
+		positive(errors, `AIGuests.{key}`, field(aiGuests, key), key == "MaximumGuests")
+	end
+	local targetParticipants = field(aiGuests, "TargetParticipants")
+	local maximumGuests = field(aiGuests, "MaximumGuests")
+	if
+		type(targetParticipants) == "number"
+		and type(maximumGuests) == "number"
+		and maximumGuests > targetParticipants
+	then
+		table.insert(errors, "AIGuests.MaximumGuests cannot exceed TargetParticipants")
+	end
+	local relocateHeat = field(aiGuests, "RelocateHeatThreshold")
+	if type(relocateHeat) == "number" and relocateHeat > 1 then
+		table.insert(errors, "AIGuests.RelocateHeatThreshold cannot exceed 1")
+	end
+	local rematch = field(config, "Rematch")
+	positive(errors, "Rematch.MinimumRequests", field(rematch, "MinimumRequests"))
+	positive(errors, "Rematch.ResultsRestartDelay", field(rematch, "ResultsRestartDelay"))
 
 	local interaction = field(config, "Interaction")
 	local hiding = field(config, "Hiding")
@@ -46,6 +223,9 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 	positive(errors, "Hiding.DefaultCapacity", field(hiding, "DefaultCapacity"))
 	positive(errors, "Hiding.ExposureDuration", field(hiding, "ExposureDuration"))
 	positive(errors, "Hiding.InspectionHeatThreshold", field(hiding, "InspectionHeatThreshold"))
+	positive(errors, "Hiding.WarmHeatThreshold", field(hiding, "WarmHeatThreshold"))
+	positive(errors, "Hiding.PeekNoise", field(hiding, "PeekNoise"), true)
+	positive(errors, "Hiding.PeekCooldown", field(hiding, "PeekCooldown"))
 
 	for _, key in ipairs({
 		"BaseRisk",
@@ -76,6 +256,14 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 		if type(inspectionHeat) == "number" and inspectionHeat > 1 then
 			table.insert(errors, "Hiding.InspectionHeatThreshold cannot exceed 1")
 		end
+		local warmHeat = field(hiding, "WarmHeatThreshold")
+		if
+			type(warmHeat) ~= "number"
+			or type(inspectionHeat) ~= "number"
+			or warmHeat >= inspectionHeat
+		then
+			table.insert(errors, "Hiding.WarmHeatThreshold must be below InspectionHeatThreshold")
+		end
 	end
 
 	local noise = field(config, "Noise")
@@ -88,6 +276,38 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 		for category, weight in pairs(categories) do
 			positive(errors, `Noise.Categories.{category}`, weight, true)
 		end
+	end
+	local movementNoise = field(config, "MovementNoise")
+	for _, key in ipairs({
+		"EmissionInterval",
+		"MinimumSpeed",
+		"SpeedForMaximum",
+		"BaseMagnitude",
+		"SpeedMagnitude",
+	}) do
+		positive(
+			errors,
+			`MovementNoise.{key}`,
+			field(movementNoise, key),
+			key == "BaseMagnitude" or key == "SpeedMagnitude"
+		)
+	end
+	local surfaceMultipliers = field(movementNoise, "SurfaceMultipliers")
+	if type(surfaceMultipliers) ~= "table" or type(surfaceMultipliers.Default) ~= "number" then
+		table.insert(errors, "MovementNoise.SurfaceMultipliers.Default must be configured")
+	else
+		for material, multiplier in pairs(surfaceMultipliers) do
+			positive(errors, `MovementNoise.SurfaceMultipliers.{material}`, multiplier)
+		end
+	end
+	local minimumSpeed = field(movementNoise, "MinimumSpeed")
+	local maximumSpeed = field(movementNoise, "SpeedForMaximum")
+	if
+		type(minimumSpeed) == "number"
+		and type(maximumSpeed) == "number"
+		and maximumSpeed <= minimumSpeed
+	then
+		table.insert(errors, "MovementNoise.SpeedForMaximum must exceed MinimumSpeed")
 	end
 
 	local positiveFields = {
@@ -135,6 +355,83 @@ function ConfigValidator.validate(config: any): (boolean, { string })
 	local rescue = field(config, "Rescue")
 	positive(errors, "Rescue.RangeGraceSeconds", field(rescue, "RangeGraceSeconds"), true)
 	positive(errors, "Rescue.CompletionGraceSeconds", field(rescue, "CompletionGraceSeconds"), true)
+	positive(errors, "Rescue.DownedEvidenceInterval", field(rescue, "DownedEvidenceInterval"))
+	positive(
+		errors,
+		"Rescue.DownedEvidenceMagnitude",
+		field(rescue, "DownedEvidenceMagnitude"),
+		true
+	)
+	local extraction = field(config, "Extraction")
+	positive(errors, "Extraction.GateJamDelay", field(extraction, "GateJamDelay"))
+	positive(errors, "Extraction.GateJamDuration", field(extraction, "GateJamDuration"))
+	local hunter = field(config, "Hunter")
+	positive(errors, "Hunter.LastKnownPursuitSeconds", field(hunter, "LastKnownPursuitSeconds"))
+	positive(errors, "Hunter.SearchPointCount", field(hunter, "SearchPointCount"))
+	positive(errors, "Hunter.SearchRadius", field(hunter, "SearchRadius"))
+	positive(
+		errors,
+		"Hunter.NearMissMinimumChaseDuration",
+		field(hunter, "NearMissMinimumChaseDuration")
+	)
+	positive(
+		errors,
+		"Hunter.NearMissMaximumClosestDistance",
+		field(hunter, "NearMissMaximumClosestDistance")
+	)
+	local searchPointCount = field(hunter, "SearchPointCount")
+	if
+		type(searchPointCount) ~= "number"
+		or searchPointCount % 1 ~= 0
+		or searchPointCount < 2
+		or searchPointCount > 3
+	then
+		table.insert(errors, "Hunter.SearchPointCount must be an integer from 2 to 3")
+	end
+	local movieMoments = field(config, "MovieMoments")
+	for _, key in ipairs({
+		"MaxPerRound",
+		"MinimumSpacing",
+		"HuntMinimumDelay",
+		"HuntMaximumDelay",
+		"BlackoutDuration",
+		"BlackoutVisionMultiplier",
+		"BlackoutMovementNoiseMultiplier",
+		"ReceptionPhoneMagnitude",
+		"GeneratorMagnitude",
+	}) do
+		positive(errors, `MovieMoments.{key}`, field(movieMoments, key))
+	end
+	local huntMinimumDelay = field(movieMoments, "HuntMinimumDelay")
+	local huntMaximumDelay = field(movieMoments, "HuntMaximumDelay")
+	if
+		type(huntMinimumDelay) == "number"
+		and type(huntMaximumDelay) == "number"
+		and huntMaximumDelay < huntMinimumDelay
+	then
+		table.insert(errors, "MovieMoments.HuntMaximumDelay must be >= HuntMinimumDelay")
+	end
+	local gateJamChance = field(movieMoments, "GateJamChance")
+	if type(gateJamChance) ~= "number" or gateJamChance < 0 or gateJamChance > 1 then
+		table.insert(errors, "MovieMoments.GateJamChance must be between 0 and 1")
+	end
+	local momentWeights = field(movieMoments, "Weights")
+	if type(momentWeights) ~= "table" then
+		table.insert(errors, "MovieMoments.Weights must be a table")
+	else
+		for _, kind in ipairs({
+			"CYCLONE_BLACKOUT",
+			"RECEPTION_PHONE",
+			"GENERATOR_RESTART",
+			"DOUBLE_TAKE",
+		}) do
+			positive(errors, `MovieMoments.Weights.{kind}`, field(momentWeights, kind))
+		end
+	end
+	local maxMoments = field(movieMoments, "MaxPerRound")
+	if type(maxMoments) ~= "number" or maxMoments % 1 ~= 0 or maxMoments < 1 or maxMoments > 2 then
+		table.insert(errors, "MovieMoments.MaxPerRound must be 1 or 2")
+	end
 	local security = field(config, "Security")
 	positive(errors, "Security.ReplayWindowSeconds", field(security, "ReplayWindowSeconds"))
 	positive(errors, "Security.MaxRequestIdLength", field(security, "MaxRequestIdLength"))

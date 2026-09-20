@@ -1,18 +1,99 @@
 --!strict
 
 return {
-	MaxPlayers = 12,
+	MaxPlayers = 8,
 
 	Round = {
 		MinimumPlayers = 2,
+		StudioMinimumPlayers = 1,
 		Durations = {
-			Lobby = 20,
-			Prepare = 15,
-			Hunt = 120,
-			Relocation = 25,
-			Extraction = 60,
-			Results = 15,
+			Lobby = 12,
+			Prepare = 12,
+			Hunt = 75,
+			Relocation = 20,
+			Extraction = 45,
+			Results = 10,
 		},
+	},
+
+	Environment = {
+		Default = "Development",
+		Profiles = {
+			Development = { AnalyticsEnabled = false, AIGuestsEnabled = true, HumanOnly = false },
+			Staging = { AnalyticsEnabled = true, AIGuestsEnabled = true, HumanOnly = false },
+			Production = { AnalyticsEnabled = true, AIGuestsEnabled = false, HumanOnly = true },
+		},
+	},
+
+	Prototype = {
+		Enabled = true,
+		EvictEnabled = false,
+		VoicePressureEnabled = false,
+		AIGuestsEnabled = false,
+		MovieMomentsEnabled = false,
+		DecoyItemsEnabled = false,
+		SocialAwardsEnabled = false,
+	},
+
+	Breath = {
+		BaseRatePerSecond = 0.014,
+		OccupancyMultipliers = { 1, 1.6, 2.2, 2.8 },
+		WarningThreshold = 0.55,
+		CriticalThreshold = 0.8,
+		Maximum = 1,
+		EmptyDecayPerSecond = 0.25,
+		ExitRelief = 0.22,
+		EntryIncreasePerOccupant = 0.04,
+	},
+
+	ListenerStop = {
+		MinimumDuration = 4,
+		MaximumDuration = 8,
+		DefaultDuration = 6,
+		RoomRadius = 30,
+		BreathMultiplier = 3,
+		Cooldown = 18,
+	},
+
+	Draw = {
+		Magnitude = 1.75,
+		CommitDuration = 5,
+		Cooldown = 12,
+	},
+
+	Fuse = {
+		InteractionDuration = 3,
+		MaxDistance = 10,
+		NoiseMagnitude = 1.35,
+	},
+
+	Movement = {
+		WalkSpeed = 16,
+		CrouchSpeed = 7,
+	},
+
+	FreeformPressure = {
+		CueSeconds = 6,
+		GraceSeconds = 12,
+		EvidenceInterval = 6,
+		EvidenceMagnitude = 0.42,
+		MovementThreshold = 1.5,
+	},
+
+	AIGuests = {
+		TargetParticipants = 4,
+		MaximumGuests = 3,
+		ThinkInterval = 0.75,
+		WalkSpeed = 11,
+		ArrivalDistance = 4,
+		RelocateHeatThreshold = 0.52,
+		RescuePerceptionDistance = 28,
+		HunterPerceptionDistance = 32,
+	},
+
+	Rematch = {
+		MinimumRequests = 1,
+		ResultsRestartDelay = 2.5,
 	},
 
 	Interaction = {
@@ -35,6 +116,9 @@ return {
 		RefusalNoise = 0.04,
 		ExposureDuration = 10,
 		InspectionHeatThreshold = 0.6,
+		WarmHeatThreshold = 0.35,
+		PeekNoise = 0.1,
+		PeekCooldown = 1.25,
 	},
 
 	Noise = {
@@ -49,6 +133,28 @@ return {
 			Decoy = 1.0,
 			FailedSilence = 1.5,
 			Environment = 0.55,
+			Draw = 1.75,
+			Fuse = 1.35,
+		},
+	},
+
+	MovementNoise = {
+		EmissionInterval = 0.55,
+		MinimumSpeed = 2.5,
+		SpeedForMaximum = 14,
+		BaseMagnitude = 0.12,
+		SpeedMagnitude = 0.28,
+		SurfaceMultipliers = {
+			Default = 1,
+			Carpet = 0.55,
+			Fabric = 0.55,
+			Wood = 0.9,
+			WoodPlanks = 0.9,
+			Slate = 1.05,
+			Limestone = 1.1,
+			Concrete = 1.1,
+			Metal = 1.35,
+			DiamondPlate = 1.45,
 		},
 	},
 
@@ -60,7 +166,7 @@ return {
 	},
 
 	Door = {
-		HoldDuration = 4,
+		HoldDuration = 8,
 		HoldNoise = 0.28,
 		Cooldown = 2,
 	},
@@ -73,6 +179,8 @@ return {
 		CapturesBeforeElimination = 2,
 		RangeGraceSeconds = 1.5,
 		CompletionGraceSeconds = 3,
+		DownedEvidenceInterval = 5,
+		DownedEvidenceMagnitude = 0.24,
 	},
 
 	Decoy = {
@@ -85,6 +193,8 @@ return {
 	Extraction = {
 		OpenDuration = 60,
 		MaxDistance = 12,
+		GateJamDelay = 12,
+		GateJamDuration = 4,
 	},
 
 	Hunter = {
@@ -106,6 +216,30 @@ return {
 		MaxReplans = 4,
 		InvestigationTimeout = 12,
 		InvestigationArrivalDistance = 8,
+		LastKnownPursuitSeconds = 1.25,
+		SearchPointCount = 3,
+		SearchRadius = 14,
+		NearMissMinimumChaseDuration = 3,
+		NearMissMaximumClosestDistance = 12,
+	},
+
+	MovieMoments = {
+		MaxPerRound = 2,
+		MinimumSpacing = 22,
+		HuntMinimumDelay = 8,
+		HuntMaximumDelay = 18,
+		GateJamChance = 0.45,
+		Weights = {
+			CYCLONE_BLACKOUT = 3,
+			RECEPTION_PHONE = 3,
+			GENERATOR_RESTART = 2,
+			DOUBLE_TAKE = 1,
+		},
+		BlackoutDuration = 8,
+		BlackoutVisionMultiplier = 0.55,
+		BlackoutMovementNoiseMultiplier = 1.3,
+		ReceptionPhoneMagnitude = 0.62,
+		GeneratorMagnitude = 0.9,
 	},
 
 	Security = {
@@ -116,12 +250,20 @@ return {
 			RequestHideEntry = { Limit = 4, WindowSeconds = 5 },
 			ResolveEntryRequest = { Limit = 6, WindowSeconds = 5 },
 			ExitHiding = { Limit = 3, WindowSeconds = 5 },
+			VolunteerOut = { Limit = 3, WindowSeconds = 5 },
+			Evict = { Limit = 2, WindowSeconds = 10 },
+			UseDraw = { Limit = 2, WindowSeconds = 15 },
 			HoldDoor = { Limit = 3, WindowSeconds = 5 },
 			ReleaseDoor = { Limit = 4, WindowSeconds = 5 },
 			StartRescue = { Limit = 3, WindowSeconds = 5 },
 			CompleteRescue = { Limit = 3, WindowSeconds = 5 },
 			UseDecoy = { Limit = 2, WindowSeconds = 10 },
 			Escape = { Limit = 3, WindowSeconds = 5 },
+			PeekHiding = { Limit = 6, WindowSeconds = 5 },
+			RequestRematch = { Limit = 2, WindowSeconds = 10 },
+			InviteFriend = { Limit = 2, WindowSeconds = 10 },
+			OnboardingStep = { Limit = 10, WindowSeconds = 30 },
+			SetCrouch = { Limit = 6, WindowSeconds = 5 },
 		},
 	},
 }

@@ -48,6 +48,12 @@ return {
 		Assert.equal(chase.state, "CHASE")
 		Assert.equal(chase.reason, "Visual")
 		local lost = brain:Decide(23, { noises = {}, heatSources = {} })
+		Assert.equal(lost.state, "CHASE")
+		Assert.equal(lost.reason, "LastKnownPosition")
+		lost = brain:Decide(23 + Config.Hunter.LastKnownPursuitSeconds, {
+			noises = {},
+			heatSources = {},
+		})
 		Assert.equal(lost.state, "SEARCH")
 	end,
 }

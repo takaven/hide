@@ -3,6 +3,12 @@
   "serveAddress": "127.0.0.1",
   "tree": {
     "$className": "DataModel",
+    "Lighting": {
+      "$className": "Lighting",
+      "$properties": {
+        "LightingStyle": "Soft"
+      }
+    },
     "ReplicatedStorage": {
       "$className": "ReplicatedStorage",
       "Hide": {

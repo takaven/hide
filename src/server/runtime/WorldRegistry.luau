@@ -42,6 +42,26 @@ local function resolveApproachPosition(instance: Instance, fallback: Vector3): V
 	return fallback
 end
 
+local function resolveExtractionPosition(instance: Instance, fallback: Vector3): Vector3
+	local approach = instance:FindFirstChild("ExtractionApproach", true)
+	if approach ~= nil then
+		if approach:IsA("BasePart") then
+			return approach.Position
+		elseif approach:IsA("Attachment") then
+			return approach.WorldPosition
+		end
+	end
+	return fallback
+end
+
+local function resolvePointCFrame(instance: Instance, name: string): CFrame?
+	local point = instance:FindFirstChild(name, true)
+	if point ~= nil and point:IsA("BasePart") then
+		return point.CFrame
+	end
+	return nil
+end
+
 function WorldRegistry.new()
 	return setmetatable(
 		{ Hiding = {}, Doors = {}, Extractions = {}, Hunters = {}, PatrolPoints = {} },
@@ -77,6 +97,8 @@ function WorldRegistry:Scan(): { string }
 				instance = instance,
 				position = position,
 				approachPosition = resolveApproachPosition(instance, position),
+				hidingCameraCFrame = resolvePointCFrame(instance, "HidingCamera"),
+				peekCFrame = resolvePointCFrame(instance, "PeekPoint"),
 				capacity = capacity,
 			}
 		end
@@ -102,7 +124,11 @@ function WorldRegistry:Scan(): { string }
 		elseif self.Extractions[id] ~= nil then
 			table.insert(errors, `duplicate ExtractionId {id}`)
 		else
-			self.Extractions[id] = { id = id, instance = instance, position = position }
+			self.Extractions[id] = {
+				id = id,
+				instance = instance,
+				position = resolveExtractionPosition(instance, position),
+			}
 		end
 	end
 
