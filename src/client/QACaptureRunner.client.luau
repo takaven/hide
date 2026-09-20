@@ -32,7 +32,7 @@ cue.TextStrokeTransparency = 0.35
 cue.Font = Enum.Font.GothamBlack
 cue.TextScaled = true
 cue.TextWrapped = true
-cue.Text = "READY TO RECORD\nPRESS F8 TO START"
+cue.Text = "READY TO RECORD\nPRESS K TO START"
 cue.Parent = gui
 
 local corner = Instance.new("UICorner")
@@ -181,4 +181,4 @@ local function startAction(_, inputState: Enum.UserInputState)
 	return Enum.ContextActionResult.Sink
 end
 
-ContextActionService:BindAction("StartQACapture", startAction, false, Enum.KeyCode.F8)
+ContextActionService:BindAction("StartQACapture", startAction, false, Enum.KeyCode.K)
